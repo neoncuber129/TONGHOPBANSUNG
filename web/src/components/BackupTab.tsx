@@ -193,9 +193,7 @@ export function AboutTab() {
         <dt>Tác giả</dt>
         <dd>TM</dd>
         <dt>Nền tảng</dt>
-        <dd>Web · React · SQLite (sql.js) — cùng schema bản Windows</dd>
-        <dt>Bản desktop</dt>
-        <dd>WPF · .NET — SQLite data.db; trao đổi qua file .thbs</dd>
+        <dd>Web · React</dd>
       </dl>
     </div>
   )

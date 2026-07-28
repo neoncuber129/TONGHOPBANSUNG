@@ -32,7 +32,7 @@ export function ScoreEntryTab() {
   const [showReport, setShowReport] = useState(false)
   const [search, setSearch] = useState('')
   const [onlySelected, setOnlySelected] = useState(false)
-  const [addCount, setAddCount] = useState(5)
+  const [addCount, setAddCount] = useState<number | ''>(5)
   const pasteStartRef = useRef(0)
 
   const group = selectedSession
@@ -194,17 +194,28 @@ export function ScoreEntryTab() {
                 min={1}
                 max={200}
                 value={addCount}
-                onChange={(e) => setAddCount(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '') {
+                    setAddCount('')
+                    return
+                  }
+                  const n = Number(v)
+                  if (Number.isFinite(n)) setAddCount(n)
+                }}
               />
             </label>
             <button
               type="button"
               className="btn small"
+              disabled={!(typeof addCount === 'number' && addCount >= 1 && addCount <= 200)}
               onClick={() => {
+                if (typeof addCount !== 'number' || addCount < 1) return
+                const n = Math.min(200, addCount)
                 const rounds = getRoundCounts(preset)
                 patchShooters((list) => [
                   ...list,
-                  ...Array.from({ length: addCount }, (_, i) =>
+                  ...Array.from({ length: n }, (_, i) =>
                     createEmptyShooter(list.length + i + 1, rounds),
                   ),
                 ])
@@ -476,6 +487,13 @@ export function ScoreEntryTab() {
   )
 }
 
+function suggestSessionName(now = new Date()) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const d = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`
+  const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  return `Đợt ${d} ${t}`
+}
+
 function CreateSessionDialog({
   groups,
   getPreset,
@@ -487,18 +505,25 @@ function CreateSessionDialog({
   onCreate: (name: string, groupId: string, count: number) => void
   onCancel: () => void
 }) {
-  const [name, setName] = useState(`Đợt ${new Date().toLocaleDateString('vi-VN')}`)
+  const [name, setName] = useState(() => suggestSessionName())
   const [groupId, setGroupId] = useState(groups[0]?.id ?? '')
-  const [count, setCount] = useState(30)
+  const [count, setCount] = useState<number | ''>(30)
   const preset = getPreset(groupId)
-  const ok = name.trim() && groupId && preset && flatTargets(preset).length > 0
+  const personCount = typeof count === 'number' ? count : 0
+  const hasTargets = !!(preset && flatTargets(preset).length > 0)
+  const ok =
+    !!name.trim() &&
+    !!groupId &&
+    hasTargets &&
+    personCount >= 1 &&
+    personCount <= 500
 
   return (
     <Modal title="Tạo đợt bắn" onClose={onCancel}>
       <div className="form-stack">
         <label>
           Tên đợt
-          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <input value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label>
           Nhóm
@@ -517,10 +542,18 @@ function CreateSessionDialog({
             min={1}
             max={500}
             value={count}
-            onChange={(e) => setCount(Math.max(1, Number(e.target.value) || 1))}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === '') {
+                setCount('')
+                return
+              }
+              const n = Number(v)
+              if (Number.isFinite(n)) setCount(n)
+            }}
           />
         </label>
-        {!ok && groupId && (
+        {groupId && !hasTargets && (
           <p className="error">Nhóm chưa cấu hình bia. Hãy sửa nhóm trước.</p>
         )}
         <div className="row-actions">
@@ -531,7 +564,7 @@ function CreateSessionDialog({
             type="button"
             className="btn primary"
             disabled={!ok}
-            onClick={() => onCreate(name.trim(), groupId, count)}
+            onClick={() => onCreate(name.trim(), groupId, personCount)}
           >
             Tạo
           </button>

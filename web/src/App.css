@@ -327,6 +327,8 @@ select {
   padding: 0.5rem 0.55rem;
   background: #fff;
   min-height: 40px;
+  /* ≥16px: tránh iOS Safari zoom khi focus input trong label nhỏ */
+  font-size: 16px;
 }
 
 .inline-fields {
@@ -1022,19 +1024,34 @@ select {
   .modal-backdrop {
     padding: 0;
     place-items: stretch;
+    /* khóa visual viewport khi bàn phím mở, tránh cảm giác phóng to */
+    overflow: hidden;
   }
 
   .modal,
   .modal-wide {
     width: 100%;
-    max-height: none;
+    max-width: 100%;
+    max-height: 100%;
     height: 100%;
+    height: 100dvh;
     border-radius: 0;
   }
 
   .modal-with-footer {
     height: 100%;
+    height: 100dvh;
     max-height: none;
+  }
+
+  .modal-body {
+    overscroll-behavior: contain;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 
   .pad-keys .btn {
