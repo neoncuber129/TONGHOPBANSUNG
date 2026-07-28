@@ -1,0 +1,200 @@
+<Window x:Class="Tonghopbansung.Views.ScoreEntryDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nhập điểm"
+        Height="640" Width="980"
+        MinHeight="480" MinWidth="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource WindowBg}"
+        ResizeMode="CanResizeWithGrip"
+        Loaded="Window_OnLoaded">
+    <Window.Resources>
+        <Style x:Key="PadScoreButton" TargetType="Button">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#2F3A32"/>
+            <Setter Property="BorderBrush" Value="#B7C4B6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#9EB0A0"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#6F8572"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#7F9482"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#3E6B4F"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#2F4A3A"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="bd" Property="Background" Value="#2F5440"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#243F30"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </MultiDataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ClearRoundButton" TargetType="Button" BasedOn="{StaticResource BtnDanger}">
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="Padding" Value="2,1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="MinHeight" Value="22"/>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="12">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentBrush}">
+                    <Run Text="Nhập điểm — "/><Run Text="{Binding ShooterName, Mode=OneWay}"/>
+                </TextBlock>
+                <TextBlock Text="{Binding SummaryText}" Margin="0,4,0,0" FontWeight="SemiBold"/>
+                <TextBlock Opacity="0.7" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Chia theo phần. Lăn chuột để cuộn ngang. Bia chấm điểm: 10→0; bia đổ: Đổ / Không."/>
+            </StackPanel>
+            <Button DockPanel.Dock="Right" Content="Xóa hết" Command="{Binding ClearAllCommand}"
+                    Style="{StaticResource BtnDanger}"
+                    VerticalAlignment="Top" Margin="12,0,0,0" Padding="12,6"/>
+        </DockPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="False">
+            <Button Content="Hủy" Click="Cancel_Click"
+                    DockPanel.Dock="Left"
+                    Padding="16,8" MinWidth="90"/>
+            <Button x:Name="SaveButton"
+                    Content="Lưu kết quả"
+                    Click="Save_Click"
+                    Style="{StaticResource BtnPrimary}"
+                    DockPanel.Dock="Right"
+                    Padding="28,12"
+                    MinWidth="160"
+                    FontSize="15"
+                    ToolTip="Ctrl+S"/>
+        </DockPanel>
+
+        <ScrollViewer x:Name="MainScroll"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      PreviewMouseWheel="MainScroll_OnPreviewMouseWheel">
+            <ItemsControl ItemsSource="{Binding ClusterGroups}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Một khối = một nhóm bia -->
+                        <Border Style="{StaticResource CardBorder}" Margin="0,0,14,0" MinWidth="140"
+                                Background="#F0F5EF">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Background="#3E6B4F" Padding="10,8" Margin="0,0,0,10" CornerRadius="3">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontWeight="Bold"
+                                               FontSize="14"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               TextWrapping="Wrap"/>
+                                </Border>
+
+                                <ItemsControl ItemsSource="{Binding Targets}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource BorderBrushSoft}"
+                                                    BorderThickness="1"
+                                                    Background="White"
+                                                    Margin="0,0,8,0"
+                                                    Padding="4"
+                                                    VerticalAlignment="Top">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               FontWeight="Bold"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Center"
+                                                               Margin="0,0,0,4"
+                                                               TextWrapping="Wrap"/>
+                                                    <ItemsControl ItemsSource="{Binding Rounds}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border BorderBrush="{StaticResource BorderBrushSoft}"
+                                                                        BorderThickness="1"
+                                                                        Margin="1,0"
+                                                                        Padding="1"
+                                                                        Background="#FAFCFA"
+                                                                        VerticalAlignment="Top">
+                                                                    <StackPanel>
+                                                                        <ItemsControl ItemsSource="{Binding ScoreButtons}">
+                                                                            <ItemsControl.ItemsPanel>
+                                                                                <ItemsPanelTemplate>
+                                                                                    <StackPanel Orientation="Vertical"/>
+                                                                                </ItemsPanelTemplate>
+                                                                            </ItemsControl.ItemsPanel>
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate>
+                                                                                    <Button Content="{Binding Label}"
+                                                                                            Style="{StaticResource PadScoreButton}"
+                                                                                            Click="ScoreButton_Click"/>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+                                                                        <Button Content="×"
+                                                                                ToolTip="Xóa phát này"
+                                                                                Style="{StaticResource ClearRoundButton}"
+                                                                                Command="{Binding DataContext.ClearRoundCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

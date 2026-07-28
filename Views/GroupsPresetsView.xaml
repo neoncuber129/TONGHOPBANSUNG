@@ -1,0 +1,124 @@
+<UserControl x:Class="Tonghopbansung.Views.GroupsPresetsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="560" d:DesignWidth="960">
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="12"/>
+            <ColumnDefinition Width="1.5*"/>
+        </Grid.ColumnDefinitions>
+
+        <DockPanel Grid.Column="0">
+            <TextBlock DockPanel.Dock="Top" Text="DANH SÁCH NHÓM" Style="{StaticResource SectionTitle}"/>
+            <TextBlock DockPanel.Dock="Top" Margin="0,0,0,10" Opacity="0.75" TextWrapping="Wrap" FontSize="12"
+                       Text="Mỗi nhóm chỉ là cấu hình bia. Danh sách người và điểm nằm ở từng đợt bắn (tab Danh sách &amp; nhập liệu)."/>
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Content="Thêm nhóm" Command="{Binding AddGroupCommand}" Margin="0,0,8,0"
+                        Style="{StaticResource BtnPrimary}" Padding="14,8"/>
+                <Button Content="Sửa nhóm" Command="{Binding EditGroupPresetCommand}"
+                        Style="{StaticResource BtnSecondary}" Margin="0,0,8,0" Padding="14,8"/>
+                <Button Content="Xóa nhóm" Command="{Binding RemoveGroupCommand}"
+                        Style="{StaticResource BtnDanger}" Padding="14,8"/>
+            </StackPanel>
+            <ListBox ItemsSource="{Binding Groups}"
+                     SelectedItem="{Binding SelectedGroup}"
+                     DisplayMemberPath="Name"
+                     BorderBrush="{StaticResource BorderBrushSoft}"
+                     MouseDoubleClick="GroupList_OnMouseDoubleClick"/>
+        </DockPanel>
+
+        <Border Grid.Column="2" Style="{StaticResource CardBorder}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <TextBlock Text="THÔNG TIN NHÓM" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,0,0,4">
+                        <Run Text="{Binding SelectedGroup.Name, Mode=OneWay, TargetNullValue=(chưa chọn)}"/>
+                    </TextBlock>
+                    <TextBlock Text="{Binding SelectedGroupSummary}" Opacity="0.8" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <Border DockPanel.Dock="Bottom" Margin="0,10,0,0"
+                        BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" Padding="8"
+                        Background="#FAFCFA">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Ngưỡng xếp loại" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                        <DataGrid ItemsSource="{Binding SelectedPreset.ClassificationRules}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  MaxHeight="120"
+                                  Background="Transparent"
+                                  BorderThickness="0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Hạng" Binding="{Binding Label}" Width="90"
+                                                    ElementStyle="{StaticResource DataGridTextCenter}"/>
+                                <DataGridTextColumn Header="Điều kiện" Binding="{Binding ConditionSummary}" Width="*"
+                                                    ElementStyle="{StaticResource DataGridTextCenter}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </Border>
+
+                <TreeView ItemsSource="{Binding SelectedPreset.Clusters}"
+                          BorderBrush="{StaticResource BorderBrushSoft}"
+                          BorderThickness="1"
+                          Background="White">
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Targets}">
+                            <Border Background="#E8F0E7" Padding="8,6" Margin="0,2" CornerRadius="3" MinWidth="280">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" Text="PHẦN" FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                               Foreground="#1F2A22" VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </Border>
+                            <HierarchicalDataTemplate.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1"
+                                            Background="#FAFCFA" Padding="8,5" Margin="20,2,0,2" MinWidth="260">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Bia" VerticalAlignment="Center" Foreground="#5A6B5E"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                                                       FontWeight="SemiBold" Foreground="#1F2A22"/>
+                                            <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="12"
+                                                       Foreground="#3A4A3E"
+                                                       Visibility="{Binding ShowRoundCount, Converter={StaticResource BoolToVis}}">
+                                                <Run Text="Số đạn: "/><Run Text="{Binding RoundCount, Mode=OneWay}"/>
+                                            </TextBlock>
+                                            <TextBlock Grid.Column="5" VerticalAlignment="Center" FontSize="12"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       Visibility="{Binding ShowKnockDownScores, Converter={StaticResource BoolToVis}}">
+                                                <Run Text="Đổ +"/><Run Text="{Binding HitBonus, Mode=OneWay}"/><Run Text="đ"/>
+                                                <Run Text=" · "/>
+                                                <Run Text="Không đổ −"/><Run Text="{Binding MissPenalty, Mode=OneWay}"/><Run Text="đ"/>
+                                            </TextBlock>
+                                            <TextBlock Grid.Column="7" Text="{Binding KindLabel}" VerticalAlignment="Center"
+                                                       FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </HierarchicalDataTemplate.ItemTemplate>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

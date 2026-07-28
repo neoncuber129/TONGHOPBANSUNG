@@ -1,0 +1,95 @@
+<Window x:Class="Tonghopbansung.Views.ClassificationRuleEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sửa hạng phân loại"
+        Width="620"
+        MinWidth="560"
+        MinHeight="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{StaticResource WindowBg}">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Hủy" IsCancel="True" Padding="14,8" MinWidth="90" Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="Lưu" IsDefault="True" Style="{StaticResource BtnPrimary}"
+                    Padding="14,8" MinWidth="100" Click="Ok_Click"/>
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock Text="Hạng phân loại" FontSize="16" FontWeight="Bold"
+                       Foreground="{StaticResource AccentBrush}" Margin="0,0,0,14"/>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Tên hạng" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}" MinHeight="32"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Ưu tiên" Style="{StaticResource FieldLabel}"
+                               ToolTip="Số lớn hơn được xét trước"/>
+                    <TextBox Text="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" MinHeight="32"/>
+                </StackPanel>
+            </Grid>
+
+            <DockPanel Margin="0,0,0,8">
+                <TextBlock Text="Điều kiện (phải thỏa tất cả)" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button DockPanel.Dock="Right" Content="+ Thêm điều kiện" Command="{Binding AddConditionCommand}"
+                        Style="{StaticResource BtnSecondary}" Padding="10,4"/>
+            </DockPanel>
+
+            <TextBlock Opacity="0.75" FontSize="12" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="Tổng điểm / bia điểm: nhập ngưỡng ≥. Bia đổ: chọn Đổ hoặc Không đổ."/>
+
+            <ItemsControl ItemsSource="{Binding ConditionRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1"
+                                Background="White" Padding="10,8" Margin="0,0,0,8" CornerRadius="3">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.4*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <ComboBox ItemsSource="{Binding Choices}"
+                                          SelectedItem="{Binding SelectedChoice}"
+                                          DisplayMemberPath="DisplayName"
+                                          MinHeight="30"/>
+
+                                <!-- Bia điểm / tổng: ≥ số -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                            Visibility="{Binding IsScoreCondition, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="≥" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="Bold"/>
+                                    <TextBox Text="{Binding MinValue, UpdateSourceTrigger=PropertyChanged}"
+                                             Width="70" MinHeight="30"/>
+                                </StackPanel>
+
+                                <!-- Bia đổ: Đổ / Không đổ -->
+                                <ComboBox Grid.Column="2"
+                                          ItemsSource="{Binding KnockDownOptions}"
+                                          SelectedItem="{Binding SelectedKnockDown}"
+                                          DisplayMemberPath="Label"
+                                          MinHeight="30"
+                                          Visibility="{Binding IsKnockDownCondition, Converter={StaticResource BoolToVis}}"/>
+
+                                <Button Grid.Column="4" Content="Xóa"
+                                        Style="{StaticResource BtnDanger}" Padding="10,4"
+                                        Command="{Binding DataContext.RemoveConditionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </DockPanel>
+</Window>

@@ -1,0 +1,86 @@
+<Window x:Class="Tonghopbansung.Views.DeleteDataDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Xóa dữ liệu"
+        Width="640" Height="560"
+        MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource WindowBg}"
+        ResizeMode="CanResizeWithGrip">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Hủy" IsCancel="True" Padding="16,8" MinWidth="90" Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="Xóa đã chọn" Style="{StaticResource BtnDanger}"
+                    Padding="16,8" MinWidth="120" Click="Delete_Click"/>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <TextBlock Text="XÓA DỮ LIỆU" FontSize="16" FontWeight="Bold"
+                       Foreground="{StaticResource AccentBrush}"/>
+            <TextBlock Margin="0,4,0,0" Opacity="0.75" TextWrapping="Wrap"
+                       Text="Tick chọn đợt và/hoặc preset cần xóa. Xóa preset sẽ xóa luôn các đợt thuộc preset đó."/>
+        </StackPanel>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Đợt -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="10">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Đợt bắn" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Chọn hết" Command="{Binding SelectAllSessionsCommand}"
+                                    Style="{StaticResource BtnSecondary}" Padding="8,3" Margin="0,0,4,0" FontSize="11"/>
+                            <Button Content="Bỏ chọn" Command="{Binding ClearSessionsCommand}"
+                                    Padding="8,3" FontSize="11"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding Sessions}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected}" Margin="0,3">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Subtitle}" Opacity="0.7" FontSize="11"/>
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Preset -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="10">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Preset (nhóm)" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Chọn hết" Command="{Binding SelectAllPresetsCommand}"
+                                    Style="{StaticResource BtnSecondary}" Padding="8,3" Margin="0,0,4,0" FontSize="11"/>
+                            <Button Content="Bỏ chọn" Command="{Binding ClearPresetsCommand}"
+                                    Padding="8,3" FontSize="11"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding Presets}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected}" Margin="0,3">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Subtitle}" Opacity="0.7" FontSize="11"/>
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

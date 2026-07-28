@@ -1,0 +1,80 @@
+<Window x:Class="Tonghopbansung.Views.ClassificationReportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Báo cáo phân loại"
+        Width="480"
+        Height="420"
+        MinWidth="400"
+        MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{StaticResource WindowBg}">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <Border BorderBrush="#C5D0C4" BorderThickness="1" Background="#F3F6F3" Padding="10,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="90"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Tổng cộng" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding TotalCount}" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Text="{Binding TotalPercentText}" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+            <Button Content="Đóng" IsCancel="True" IsDefault="True"
+                    HorizontalAlignment="Right" Margin="0,12,0,0"
+                    Padding="16,8" MinWidth="90" Click="Close_Click"/>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold"
+                       Foreground="{StaticResource AccentBrush}"/>
+            <TextBlock Text="{Binding Subtitle}" Opacity="0.8" FontSize="12" Margin="0,4,0,0"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Border BorderBrush="#C5D0C4" BorderThickness="1" Background="White">
+            <DockPanel>
+                <Border DockPanel.Dock="Top" Background="#3E6B4F" Padding="10,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="90"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Phân loại" Foreground="White" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1" Text="Số lượng" Foreground="White" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="%" Foreground="White" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#E2E8E0" BorderThickness="0,0,0,1" Padding="10,8"
+                                    Background="White">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="90"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Count}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding PercentText}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+        </Border>
+    </DockPanel>
+</Window>

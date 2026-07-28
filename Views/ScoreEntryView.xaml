@@ -1,0 +1,154 @@
+<UserControl x:Class="Tonghopbansung.Views.ScoreEntryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="560" d:DesignWidth="1100">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBlock Text="DANH SÁCH &amp; NHẬP SỐ LIỆU" Style="{StaticResource SectionTitle}"/>
+
+            <!-- Hàng 1: đợt + tìm -->
+            <WrapPanel ItemHeight="32" Margin="0,0,0,8">
+                <TextBlock Text="Đợt bắn:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox ItemsSource="{Binding Sessions}"
+                          SelectedItem="{Binding SelectedSession}"
+                          DisplayMemberPath="Name"
+                          Width="200" Height="28" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Button Content="Tạo đợt" Command="{Binding CreateSessionCommand}"
+                        Style="{StaticResource BtnPrimary}" Height="28" MinWidth="80"
+                        Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <Button Content="Xóa đợt" Command="{Binding RemoveSessionCommand}"
+                        Style="{StaticResource BtnDanger}" Height="28" MinWidth="80"
+                        Padding="12,0" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                <TextBlock Text="Tìm:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBox Text="{Binding NameSearch, UpdateSourceTrigger=PropertyChanged}"
+                         Width="160" Height="28" VerticalAlignment="Center" Margin="0,0,4,0"
+                         VerticalContentAlignment="Center"
+                         ToolTip="Tìm theo họ tên, cấp bậc, chức vụ, đơn vị"/>
+                <Button Content="×" Command="{Binding ClearNameSearchCommand}"
+                        ToolTip="Xóa tìm kiếm" Height="28" Width="28"
+                        Padding="0" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                <CheckBox Content="Chỉ hiện người đã chọn"
+                          IsChecked="{Binding ShowOnlySelected}"
+                          VerticalAlignment="Center"/>
+            </WrapPanel>
+
+            <!-- Hàng 2: thao tác -->
+            <WrapPanel ItemHeight="32" Margin="0,0,0,6">
+                <Button Content="Xuất Excel" Command="{Binding ExportExcelCommand}"
+                        Style="{StaticResource BtnPrimary}" Height="28" MinWidth="96"
+                        Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"
+                        ToolTip="Xuất người đã tick Chọn; nếu chưa chọn thì hỏi xuất tất cả có tên"/>
+                <Button Content="Báo cáo" Command="{Binding ShowReportCommand}"
+                        Style="{StaticResource BtnSecondary}" Height="28" MinWidth="80"
+                        Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"
+                        ToolTip="Xem bảng phân loại theo số lượng và %"/>
+                <Button Content="Chọn tất cả (có tên)" Command="{Binding SelectAllCommand}"
+                        Style="{StaticResource BtnSecondary}" Height="28" MinWidth="140"
+                        Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <Button Content="Bỏ chọn" Command="{Binding DeselectAllCommand}"
+                        Height="28" MinWidth="80" Padding="12,0" Margin="0,0,6,0"
+                        VerticalAlignment="Center"/>
+                <Button Content="Làm mới" Command="{Binding RefreshRowsCommand}"
+                        Height="28" MinWidth="80" Padding="12,0" Margin="0,0,6,0"
+                        VerticalAlignment="Center"/>
+                <Button Content="Xóa dòng" Command="{Binding RemoveSelectedRowsCommand}"
+                        Style="{StaticResource BtnDanger}" Height="28" MinWidth="88"
+                        Padding="12,0" Margin="0,0,0,0" VerticalAlignment="Center"
+                        ToolTip="Xóa các dòng đã tick Chọn"/>
+            </WrapPanel>
+
+            <TextBlock Text="{Binding SessionInfo}" Opacity="0.8" FontSize="12" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource CardBorder}" Margin="0,8,0,0" Padding="10,8">
+            <WrapPanel ItemHeight="32">
+                <TextBlock Text="Thêm dòng mới:" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
+                <TextBox Text="{Binding AddRowCount, UpdateSourceTrigger=PropertyChanged}"
+                         Width="70" Height="28" VerticalAlignment="Center" Margin="0,0,8,0"
+                         VerticalContentAlignment="Center" ToolTip="Số dòng cần thêm"/>
+                <Button Content="Thêm dòng" Command="{Binding AddMoreRowsCommand}"
+                        Style="{StaticResource BtnPrimary}" Height="28" MinWidth="96"
+                        Padding="12,0" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                <TextBlock VerticalAlignment="Center" Opacity="0.75"
+                           Text="{Binding VisibleRowCount, StringFormat=Đang hiển thị {0} dòng}"/>
+            </WrapPanel>
+        </Border>
+
+        <DataGrid x:Name="MainGrid"
+                  ItemsSource="{Binding Rows}"
+                  FrozenColumnCount="3"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  CanUserReorderColumns="False"
+                  GridLinesVisibility="All"
+                  HeadersVisibility="Column"
+                  AlternatingRowBackground="#F3F6F3"
+                  BorderBrush="{StaticResource BorderBrushSoft}"
+                  BorderThickness="1"
+                  SelectionMode="Extended"
+                  SelectionUnit="Cell"
+                  ClipboardCopyMode="ExcludeHeader"
+                  EnableRowVirtualization="True"
+                  EnableColumnVirtualization="True"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  ScrollViewer.IsDeferredScrollingEnabled="True"
+                  ScrollViewer.CanContentScroll="True"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  PreviewKeyDown="MainGrid_OnPreviewKeyDown"
+                  PreviewTextInput="MainGrid_OnPreviewTextInput"
+                  PreparingCellForEdit="MainGrid_OnPreparingCellForEdit"
+                  CellEditEnding="MainGrid_OnCellEditEnding"
+                  CurrentCellChanged="MainGrid_OnCurrentCellChanged"
+                  LoadingRow="MainGrid_OnLoadingRow"
+                  PreviewMouseRightButtonDown="MainGrid_OnPreviewMouseRightButtonDown">
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="#E4EDE3"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="Padding" Value="8,6"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+            <DataGrid.CellStyle>
+                <Style TargetType="DataGridCell" BasedOn="{StaticResource DataGridCellCenter}">
+                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                    <Setter Property="Padding" Value="4,2"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="#C5D9F1"/>
+                            <Setter Property="Foreground" Value="Black"/>
+                            <Setter Property="BorderBrush" Value="#2F75B5"/>
+                            <Setter Property="BorderThickness" Value="1.5"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter Property="BorderBrush" Value="#2F75B5"/>
+                            <Setter Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.CellStyle>
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <!-- Không highlight cả dòng khi chọn ô -->
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+        </DataGrid>
+    </DockPanel>
+</UserControl>
