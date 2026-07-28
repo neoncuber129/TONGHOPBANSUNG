@@ -662,7 +662,8 @@ function ScorePadDialog({
                       </div>
                     ) : (
                       row.map((v, ri) => (
-                        <div key={ri} className="pad-round">
+                        <div key={ri} className="pad-round pad-round-inline">
+                          <span className="pad-round-label">Phát {ri + 1}</span>
                           <div className="pad-keys">
                             {Array.from({ length: 11 }, (_, score) => 10 - score).map((score) => (
                               <button

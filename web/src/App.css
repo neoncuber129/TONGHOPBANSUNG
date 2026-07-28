@@ -747,8 +747,6 @@ select {
 }
 
 .pad-round {
-  display: grid;
-  gap: 0.3rem;
   margin-bottom: 0.45rem;
   padding: 0.4rem 0.45rem;
   border-radius: 8px;
@@ -758,6 +756,25 @@ select {
 
 .pad-round:nth-child(even) {
   background: rgba(255, 255, 255, 0.9);
+}
+
+.pad-round-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.6rem;
+}
+
+.pad-round-label {
+  flex: 0 0 auto;
+  min-width: 3.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pad-round-inline .pad-keys {
+  flex: 1 1 auto;
 }
 
 .pad-score {
