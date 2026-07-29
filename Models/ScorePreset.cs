@@ -63,6 +63,80 @@ public partial class ScorePreset : ObservableObject
         return true;
     }
 
+    /// <summary>
+    /// So khớp cấu hình bia đầy đủ (phần, bia, thưởng/phạt, xếp loại) —
+    /// bỏ qua Guid và tên preset vì hai máy có thể đặt tên nhóm khác nhau.
+    /// Dùng khi nhập đợt bắn từ máy khác.
+    /// </summary>
+    public bool SameConfigurationAs(ScorePreset? other)
+    {
+        if (other is null) return false;
+        if (Clusters.Count != other.Clusters.Count) return false;
+
+        for (var ci = 0; ci < Clusters.Count; ci++)
+        {
+            var a = Clusters[ci];
+            var b = other.Clusters[ci];
+            if (!string.Equals(a.Name?.Trim(), b.Name?.Trim(), StringComparison.Ordinal))
+                return false;
+            if (a.Targets.Count != b.Targets.Count) return false;
+            for (var ti = 0; ti < a.Targets.Count; ti++)
+            {
+                var ta = a.Targets[ti];
+                var tb = b.Targets[ti];
+                if (!string.Equals(ta.Name?.Trim(), tb.Name?.Trim(), StringComparison.Ordinal))
+                    return false;
+                if (ta.RoundCount != tb.RoundCount) return false;
+                if (ta.Kind != tb.Kind) return false;
+                if (ta.MissPenalty != tb.MissPenalty) return false;
+                if (ta.HitBonus != tb.HitBonus) return false;
+            }
+        }
+
+        if (ClassificationRules.Count != other.ClassificationRules.Count) return false;
+        for (var ri = 0; ri < ClassificationRules.Count; ri++)
+        {
+            var ra = ClassificationRules[ri];
+            var rb = other.ClassificationRules[ri];
+            var aConditions = NormalizedConditions(ra);
+            var bConditions = NormalizedConditions(rb);
+            if (!string.Equals(ra.Label?.Trim(), rb.Label?.Trim(), StringComparison.Ordinal))
+                return false;
+            if (ra.MinScore != rb.MinScore) return false;
+            if (NormalizedPriority(ra) != NormalizedPriority(rb)) return false;
+            if (aConditions.Count != bConditions.Count) return false;
+            for (var ci = 0; ci < aConditions.Count; ci++)
+            {
+                var ca = aConditions[ci];
+                var cb = bConditions[ci];
+                if (ca.Kind != cb.Kind) return false;
+                if (ca.TargetIndex != cb.TargetIndex) return false;
+                if (ca.MinValue != cb.MinValue) return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static IReadOnlyList<ClassificationCondition> NormalizedConditions(
+        ClassificationRule rule) =>
+        rule.Conditions.Count > 0
+            ? rule.Conditions
+            :
+            [
+                new ClassificationCondition
+                {
+                    Kind = ClassificationConditionKind.TotalScore,
+                    TargetIndex = -1,
+                    MinValue = rule.MinScore
+                }
+            ];
+
+    private static int NormalizedPriority(ClassificationRule rule) =>
+        rule.Conditions.Count == 0 && rule.Priority == 0
+            ? rule.MinScore
+            : rule.Priority;
+
     public void EnsureDefaultClusters(int targetCount = 2, int rounds = 5)
     {
         if (Clusters.Count > 0 && TargetCount > 0) return;

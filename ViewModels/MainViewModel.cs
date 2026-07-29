@@ -14,7 +14,8 @@ public partial class MainViewModel : ObservableObject
     {
         var store = new SqliteDataStore();
         var backup = new BackupService();
-        Session = new AppSession(store, backup);
+        var sessionTransfer = new SessionTransferService();
+        Session = new AppSession(store, backup, sessionTransfer);
         Session.Load();
 
         GroupsPresets = new GroupsPresetsViewModel(Session);

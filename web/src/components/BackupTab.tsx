@@ -90,7 +90,9 @@ export function BackupTab() {
       </div>
       <p className="hint">
         Sao lưu/phục hồi dùng SQLite (.thbs / .db) — cùng format với bản Windows (WPF).
-        Vẫn đọc được file .json cũ. Dữ liệu web lưu trên trình duyệt này; xóa cache có thể mất data nếu chưa sao lưu.
+        Vẫn đọc được file .json cũ. Để xuất/nhập <strong>một đợt bắn</strong> giữa các máy, dùng
+        nút «Xuất đợt» / «Nhập đợt» (.thbss) ở tab Danh sách — chỉ khi preset cùng cấu hình.
+        Dữ liệu web lưu trên trình duyệt này; xóa cache có thể mất data nếu chưa sao lưu.
         Nút «Lấy DB mặc định» nạp lại bộ dữ liệu mẫu kèm theo ứng dụng (ghi đè dữ liệu local).
       </p>
 

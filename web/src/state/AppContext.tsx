@@ -23,6 +23,16 @@ import {
   type ShootingSession,
 } from '../domain/types'
 import {
+  appendShootersFromTransfer,
+  buildSessionTransfer,
+  createSessionFromTransfer,
+  downloadSessionTransfer,
+  findMatchingGroups,
+  presetsMatchExactly,
+  readSessionTransferFile,
+  type SessionTransferFile,
+} from '../domain/sessionTransfer'
+import {
   downloadSqliteBackup,
   isDefaultDbOfferVisible,
   isWorkspaceEmpty,
@@ -60,6 +70,14 @@ interface AppContextValue {
   deleteSelectedData: (sessionIds: string[], groupIds: string[]) => void
   exportBackup: () => void
   importBackup: (file: File) => Promise<void>
+  exportSession: (sessionId: string) => void
+  importSessionCreate: (file: File, targetGroupId: string) => Promise<void>
+  importSessionAppend: (file: File, targetSessionId: string) => Promise<void>
+  previewSessionTransfer: (file: File) => Promise<{
+    pack: SessionTransferFile
+    matchingGroups: Group[]
+    canAppendToActive: boolean
+  }>
   loadDefaultDb: () => Promise<void>
   replaceState: (next: AppState) => Promise<void>
   getPresetForGroup: (groupId: string) => ScorePreset | null
@@ -359,6 +377,99 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await markDefaultDbConsumed()
       setShowDefaultDbButton(false)
       setStatusMessage('Phục hồi thành công')
+    },
+    exportSession: (sessionId) => {
+      const current = stateRef.current
+      if (!current) return
+      const session = current.sessions.find((s) => s.id === sessionId)
+      if (!session) {
+        setStatusMessage('Không tìm thấy đợt bắn.')
+        return
+      }
+      const group = current.groups.find((g) => g.id === session.groupId)
+      const preset = group
+        ? current.presets.find((p) => p.id === group.presetId)
+        : undefined
+      if (!preset || flatTargets(preset).length === 0) {
+        setStatusMessage('Đợt chưa gắn cấu hình bia hợp lệ.')
+        return
+      }
+      try {
+        downloadSessionTransfer(buildSessionTransfer(session, preset, group ?? null))
+        setStatusMessage(`Đã xuất đợt "${session.name}" (.thbss)`)
+      } catch (e) {
+        setStatusMessage(`Lỗi xuất đợt: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    previewSessionTransfer: async (file) => {
+      const current = stateRef.current
+      if (!current) throw new Error('Chưa tải dữ liệu.')
+      const pack = await readSessionTransferFile(file)
+      const matchingGroups = findMatchingGroups(current.groups, current.presets, pack.preset)
+      const active = current.sessions.find((s) => s.id === current.activeSessionId)
+      let canAppendToActive = false
+      if (active) {
+        const g = current.groups.find((x) => x.id === active.groupId)
+        const p = g ? current.presets.find((x) => x.id === g.presetId) : null
+        canAppendToActive = !!(p && presetsMatchExactly(p, pack.preset))
+      }
+      return { pack, matchingGroups, canAppendToActive }
+    },
+    importSessionCreate: async (file, targetGroupId) => {
+      const current = stateRef.current
+      if (!current) throw new Error('Chưa tải dữ liệu.')
+      const pack = await readSessionTransferFile(file)
+      const group = current.groups.find((g) => g.id === targetGroupId)
+      if (!group) throw new Error('Nhóm đích không tồn tại.')
+      const preset = current.presets.find((p) => p.id === group.presetId)
+      if (!preset) throw new Error('Nhóm đích chưa có cấu hình bia.')
+      if (!presetsMatchExactly(preset, pack.preset)) {
+        throw new Error(
+          'Cấu hình bia của nhóm đích không khớp với file. Chỉ nhập khi preset cùng cấu hình.',
+        )
+      }
+      const session = createSessionFromTransfer(pack, targetGroupId)
+      const next: AppState = {
+        ...current,
+        sessions: [...current.sessions, session],
+        activeSessionId: session.id,
+        activeGroupId: targetGroupId,
+      }
+      setState(next)
+      await saveState(next)
+      setStatusMessage(
+        `Đã nhập đợt "${session.name}" (${session.shooters.length} người) vào nhóm "${group.name}"`,
+      )
+    },
+    importSessionAppend: async (file, targetSessionId) => {
+      const current = stateRef.current
+      if (!current) throw new Error('Chưa tải dữ liệu.')
+      const pack = await readSessionTransferFile(file)
+      const session = current.sessions.find((s) => s.id === targetSessionId)
+      if (!session) throw new Error('Đợt đích không tồn tại.')
+      const group = current.groups.find((g) => g.id === session.groupId)
+      const preset = group
+        ? current.presets.find((p) => p.id === group.presetId)
+        : null
+      if (!preset) throw new Error('Đợt đích chưa gắn cấu hình bia.')
+      if (!presetsMatchExactly(preset, pack.preset)) {
+        throw new Error(
+          'Cấu hình bia của đợt hiện tại không khớp với file. Chỉ nối khi preset cùng cấu hình.',
+        )
+      }
+      const shooters = appendShootersFromTransfer(session, pack, preset)
+      const next: AppState = {
+        ...current,
+        sessions: current.sessions.map((s) =>
+          s.id === targetSessionId ? { ...s, shooters } : s,
+        ),
+        activeSessionId: targetSessionId,
+      }
+      setState(next)
+      await saveState(next)
+      setStatusMessage(
+        `Đã nối ${pack.session.shooters.length} người vào đợt "${session.name}" (tổng ${shooters.length})`,
+      )
     },
     loadDefaultDb: async () => {
       const seeded = await loadBundledDefaultState()

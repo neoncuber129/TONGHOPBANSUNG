@@ -473,6 +473,116 @@ public partial class ScoreEntryViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ExportSession()
+    {
+        if (SelectedSession is null)
+        {
+            MessageBox.Show("Hãy chọn đợt bắn trước.", "Xuất đợt",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var preset = _session.GetPresetForSession(SelectedSession);
+        if (preset is null || preset.TargetCount == 0)
+        {
+            MessageBox.Show("Đợt chưa gắn nhóm / cấu hình bia.", "Xuất đợt",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var safeName = string.Join("_", SelectedSession.Name.Split(Path.GetInvalidFileNameChars()));
+        var dlg = new SaveFileDialog
+        {
+            Filter = "Đợt bắn (*.thbss)|*.thbss|JSON (*.json)|*.json",
+            FileName = $"{safeName}_{DateTime.Now:yyyyMMdd_HHmm}.thbss",
+            DefaultExt = ".thbss"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            await _session.ExportSessionAsync(SelectedSession, dlg.FileName);
+            MessageBox.Show($"Đã xuất đợt \"{SelectedSession.Name}\".", "Xuất đợt",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi xuất đợt:\n{ex.Message}", "Xuất đợt",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportSession()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Đợt bắn (*.thbss;*.json)|*.thbss;*.json|Tất cả (*.*)|*.*"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        SessionTransferFile pack;
+        try
+        {
+            pack = await Task.Run(() => _session.LoadSessionTransfer(dlg.FileName));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi đọc file đợt:\n{ex.Message}", "Nhập đợt",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var matching = _session.FindGroupsMatchingPreset(pack.Preset);
+        var canAppend = _session.CanAppendSessionTransfer(pack, SelectedSession);
+        if (matching.Count == 0 && !canAppend)
+        {
+            MessageBox.Show(
+                "Không có nhóm/đợt nào có cùng cấu hình bia với file này.\nChỉ nhập khi preset cùng cấu hình.",
+                "Nhập đợt", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var importVm = new ImportSessionViewModel(
+            pack.Session.Name,
+            pack.Session.Shooters.Count,
+            matching,
+            canAppend,
+            SelectedSession?.Name);
+
+        var dialog = new ImportSessionDialog
+        {
+            Owner = Application.Current.MainWindow,
+            DataContext = importVm
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            if (importVm.Mode == ImportSessionMode.Append)
+            {
+                if (SelectedSession is null) return;
+                await _session.ImportSessionAppendAsync(pack, SelectedSession);
+            }
+            else
+            {
+                if (importVm.SelectedGroup is null) return;
+                await _session.ImportSessionCreateAsync(pack, importVm.SelectedGroup);
+            }
+
+            OnPropertyChanged(nameof(SelectedSession));
+            ReloadSessionRows(force: true);
+            MessageBox.Show(_session.StatusMessage, "Nhập đợt",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi nhập đợt:\n{ex.Message}", "Nhập đợt",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
     private void RefreshRows() => ReloadSessionRows(force: true);
 
     private void ReloadSessionRows(bool force)

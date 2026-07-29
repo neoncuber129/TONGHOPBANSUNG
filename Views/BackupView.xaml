@@ -20,6 +20,9 @@
                 <Button Content="Mở thư mục dữ liệu" Command="{Binding OpenDataFolderCommand}" Style="{StaticResource BtnSecondary}" Margin="0,0,10,10" Padding="16,10"/>
                 <Button Content="Lưu ngay" Command="{Binding SaveNowCommand}" Style="{StaticResource BtnPrimary}" Margin="0,0,10,10" Padding="16,10"/>
             </WrapPanel>
+
+            <TextBlock Margin="0,8,0,0" Opacity="0.75" TextWrapping="Wrap"
+                       Text="Để xuất/nhập một đợt bắn giữa các máy (không ghi đè toàn bộ CSDL), dùng «Xuất đợt» / «Nhập đợt» (.thbss) ở tab Danh sách — chỉ khi preset cùng cấu hình."/>
         </StackPanel>
     </Grid>
 </UserControl>

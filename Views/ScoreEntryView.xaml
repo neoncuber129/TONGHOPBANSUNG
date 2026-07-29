@@ -21,7 +21,15 @@
                         Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"/>
                 <Button Content="Xóa đợt" Command="{Binding RemoveSessionCommand}"
                         Style="{StaticResource BtnDanger}" Height="28" MinWidth="80"
-                        Padding="12,0" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                        Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <Button Content="Xuất đợt" Command="{Binding ExportSessionCommand}"
+                        Style="{StaticResource BtnSecondary}" Height="28" MinWidth="88"
+                        Padding="12,0" Margin="0,0,6,0" VerticalAlignment="Center"
+                        ToolTip="Xuất riêng đợt đang chọn (.thbss) để máy khác nhập"/>
+                <Button Content="Nhập đợt" Command="{Binding ImportSessionCommand}"
+                        Style="{StaticResource BtnSecondary}" Height="28" MinWidth="88"
+                        Padding="12,0" Margin="0,0,16,0" VerticalAlignment="Center"
+                        ToolTip="Nhập file đợt (.thbss): tạo đợt mới hoặc nối vào đợt hiện tại (cùng preset)"/>
                 <TextBlock Text="Tìm:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBox Text="{Binding NameSearch, UpdateSourceTrigger=PropertyChanged}"
                          Width="160" Height="28" VerticalAlignment="Center" Margin="0,0,4,0"

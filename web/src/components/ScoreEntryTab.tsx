@@ -25,15 +25,27 @@ export function ScoreEntryTab() {
     updateShooter,
     getPresetForGroup,
     runBusy,
+    exportSession,
+    previewSessionTransfer,
+    importSessionCreate,
+    importSessionAppend,
+    setStatus,
   } = useApp()
 
   const [showCreate, setShowCreate] = useState(false)
   const [scoreShooterId, setScoreShooterId] = useState<string | null>(null)
   const [showReport, setShowReport] = useState(false)
+  const [importPreview, setImportPreview] = useState<{
+    file: File
+    pack: Awaited<ReturnType<typeof previewSessionTransfer>>['pack']
+    matchingGroups: { id: string; name: string }[]
+    canAppendToActive: boolean
+  } | null>(null)
   const [search, setSearch] = useState('')
   const [onlySelected, setOnlySelected] = useState(false)
   const [addCount, setAddCount] = useState<number | ''>(5)
   const pasteStartRef = useRef(0)
+  const importFileRef = useRef<HTMLInputElement>(null)
 
   const group = selectedSession
     ? state.groups.find((g) => g.id === selectedSession.groupId) ?? null
@@ -109,6 +121,35 @@ export function ScoreEntryTab() {
     })
   }
 
+  function handleExportSession() {
+    if (!selectedSession) return
+    exportSession(selectedSession.id)
+  }
+
+  function handleImportFile(file: File) {
+    void runBusy('Đang đọc file đợt...', async () => {
+      try {
+        const preview = await previewSessionTransfer(file)
+        if (preview.matchingGroups.length === 0 && !preview.canAppendToActive) {
+          alert(
+            'Không có nhóm/đợt nào có cùng cấu hình bia với file này. Chỉ nhập khi preset cùng cấu hình.',
+          )
+          return
+        }
+        setImportPreview({
+          file,
+          pack: preview.pack,
+          matchingGroups: preview.matchingGroups.map((g) => ({ id: g.id, name: g.name })),
+          canAppendToActive: preview.canAppendToActive,
+        })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        setStatus(`Lỗi đọc file đợt: ${msg}`)
+        alert(msg)
+      }
+    })
+  }
+
   const hasKnockDown = targets.some((t) => t.kind === TargetKind.KnockDown)
 
   return (
@@ -143,6 +184,34 @@ export function ScoreEntryTab() {
           >
             Xóa đợt
           </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={!selectedSession}
+            onClick={handleExportSession}
+            title="Xuất riêng đợt đang chọn (.thbss) để máy khác nhập"
+          >
+            Xuất đợt
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => importFileRef.current?.click()}
+            title="Nhập file đợt (.thbss) — tạo đợt mới hoặc nối vào đợt hiện tại"
+          >
+            Nhập đợt
+          </button>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".thbss,application/json"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) handleImportFile(file)
+            }}
+          />
         </div>
         <label className="grow">
           Tìm
@@ -464,6 +533,45 @@ export function ScoreEntryTab() {
         />
       )}
 
+      {importPreview && (
+        <ImportSessionDialog
+          packName={importPreview.pack.session.name}
+          shooterCount={importPreview.pack.session.shooters.length}
+          matchingGroups={importPreview.matchingGroups}
+          canAppend={importPreview.canAppendToActive}
+          activeSessionName={selectedSession?.name ?? null}
+          onCancel={() => setImportPreview(null)}
+          onCreate={(groupId) => {
+            const file = importPreview.file
+            setImportPreview(null)
+            void runBusy('Đang nhập đợt...', async () => {
+              try {
+                await importSessionCreate(file, groupId)
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e)
+                setStatus(`Lỗi nhập đợt: ${msg}`)
+                alert(msg)
+              }
+            })
+          }}
+          onAppend={() => {
+            if (!selectedSession) return
+            const file = importPreview.file
+            const sessionId = selectedSession.id
+            setImportPreview(null)
+            void runBusy('Đang nối đợt...', async () => {
+              try {
+                await importSessionAppend(file, sessionId)
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e)
+                setStatus(`Lỗi nối đợt: ${msg}`)
+                alert(msg)
+              }
+            })
+          }}
+        />
+      )}
+
       {scoringShooter && selectedSession && preset && (
         <ScorePadDialog
           shooter={scoringShooter}
@@ -492,6 +600,112 @@ function suggestSessionName(now = new Date()) {
   const d = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`
   const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
   return `Đợt ${d} ${t}`
+}
+
+function ImportSessionDialog({
+  packName,
+  shooterCount,
+  matchingGroups,
+  canAppend,
+  activeSessionName,
+  onCreate,
+  onAppend,
+  onCancel,
+}: {
+  packName: string
+  shooterCount: number
+  matchingGroups: { id: string; name: string }[]
+  canAppend: boolean
+  activeSessionName: string | null
+  onCreate: (groupId: string) => void
+  onAppend: () => void
+  onCancel: () => void
+}) {
+  const [mode, setMode] = useState<'create' | 'append'>(
+    canAppend && matchingGroups.length === 0 ? 'append' : 'create',
+  )
+  const [groupId, setGroupId] = useState(matchingGroups[0]?.id ?? '')
+  const createOk = mode === 'create' && !!groupId && matchingGroups.length > 0
+  const appendOk = mode === 'append' && canAppend
+
+  return (
+    <Modal title="Nhập đợt bắn" onClose={onCancel}>
+      <div className="form-stack">
+        <p>
+          File: <strong>{packName}</strong> · {shooterCount} người
+        </p>
+        <fieldset className="form-stack" style={{ border: 'none', padding: 0, margin: 0 }}>
+          <legend className="muted">Cách nhập</legend>
+          <label className="check">
+            <input
+              type="radio"
+              name="import-mode"
+              checked={mode === 'create'}
+              disabled={matchingGroups.length === 0}
+              onChange={() => setMode('create')}
+            />
+            Tạo đợt mới
+          </label>
+          <label className="check">
+            <input
+              type="radio"
+              name="import-mode"
+              checked={mode === 'append'}
+              disabled={!canAppend}
+              onChange={() => setMode('append')}
+            />
+            Nối vào đợt hiện tại
+            {activeSessionName ? ` («${activeSessionName}»)` : ''}
+          </label>
+        </fieldset>
+        {mode === 'create' && (
+          <label>
+            Nhóm đích (preset cùng cấu hình)
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              disabled={matchingGroups.length === 0}
+            >
+              {matchingGroups.length === 0 ? (
+                <option value="">— Không có nhóm khớp —</option>
+              ) : (
+                matchingGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+        )}
+        {mode === 'append' && !canAppend && (
+          <p className="error">
+            Đợt đang mở không có cùng cấu hình bia với file. Hãy chọn «Tạo đợt mới» hoặc mở đúng
+            đợt.
+          </p>
+        )}
+        {matchingGroups.length === 0 && !canAppend && (
+          <p className="error">Không có nhóm/đợt nào khớp preset trong file.</p>
+        )}
+        <div className="row-actions">
+          <button type="button" className="btn" onClick={onCancel}>
+            Hủy
+          </button>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!(createOk || appendOk)}
+            onClick={() => {
+              if (mode === 'append') onAppend()
+              else onCreate(groupId)
+            }}
+          >
+            {mode === 'append' ? 'Nối đợt' : 'Tạo đợt'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 function CreateSessionDialog({

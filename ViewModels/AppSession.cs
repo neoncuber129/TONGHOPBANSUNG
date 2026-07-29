@@ -10,6 +10,7 @@ public partial class AppSession : ObservableObject
 {
     private readonly IDataStore _store;
     private readonly IBackupService _backup;
+    private readonly ISessionTransferService _sessionTransfer;
 
     public ObservableCollection<ScorePreset> Presets { get; } = new();
     public ObservableCollection<Group> Groups { get; } = new();
@@ -30,10 +31,11 @@ public partial class AppSession : ObservableObject
     [ObservableProperty]
     private string _busyMessage = string.Empty;
 
-    public AppSession(IDataStore store, IBackupService backup)
+    public AppSession(IDataStore store, IBackupService backup, ISessionTransferService? sessionTransfer = null)
     {
         _store = store;
         _backup = backup;
+        _sessionTransfer = sessionTransfer ?? new SessionTransferService();
     }
 
     public string DataDirectory => _store.DataDirectory;
@@ -469,6 +471,128 @@ public partial class AppSession : ObservableObject
             await Task.Run(() => _store.Save(snap)).ConfigureAwait(true);
         });
         StatusMessage = $"Đã phục hồi từ: {path}";
+    }
+
+    public SessionTransferFile LoadSessionTransfer(string path) =>
+        _sessionTransfer.Import(path);
+
+    public IReadOnlyList<Group> FindGroupsMatchingPreset(ScorePreset importedPreset) =>
+        Groups.Where(g =>
+        {
+            var p = GetPreset(g.PresetId);
+            return p is not null && p.SameConfigurationAs(importedPreset);
+        }).ToList();
+
+    public bool CanAppendSessionTransfer(SessionTransferFile pack, ShootingSession? target)
+    {
+        var preset = GetPresetForSession(target);
+        return preset is not null && preset.SameConfigurationAs(pack.Preset);
+    }
+
+    public async Task ExportSessionAsync(ShootingSession session, string path)
+    {
+        var preset = GetPresetForSession(session)
+            ?? throw new InvalidOperationException("Đợt chưa gắn cấu hình bia hợp lệ.");
+        if (preset.TargetCount == 0)
+            throw new InvalidOperationException("Đợt chưa gắn cấu hình bia hợp lệ.");
+
+        var group = GetGroupForSession(session);
+        FlushDeferredPersist(save: false);
+        var pack = _sessionTransfer.Build(session, preset, group);
+        await RunBusyAsync("Đang xuất đợt bắn...", () => _sessionTransfer.Export(pack, path));
+        StatusMessage = $"Đã xuất đợt \"{session.Name}\": {path}";
+    }
+
+    public async Task<ShootingSession> ImportSessionCreateAsync(SessionTransferFile pack, Group targetGroup)
+    {
+        var localPreset = GetPresetForGroup(targetGroup)
+            ?? throw new InvalidOperationException("Nhóm đích chưa có cấu hình bia.");
+        if (!localPreset.SameConfigurationAs(pack.Preset))
+            throw new InvalidOperationException(
+                "Cấu hình bia của nhóm đích không khớp với file. Chỉ nhập khi preset cùng cấu hình.");
+
+        var session = new ShootingSession
+        {
+            Id = Guid.NewGuid(),
+            Name = pack.Session.Name.Trim(),
+            GroupId = targetGroup.Id,
+            CreatedAt = DateTime.Now
+        };
+
+        await RunBusyAsync("Đang nhập đợt bắn...", async () =>
+        {
+            foreach (var shooter in RemintShooters(pack.Session.Shooters, localPreset, startOrder: 1))
+                session.Shooters.Add(shooter);
+
+            Sessions.Add(session);
+            SelectedSession = session;
+            SelectedGroup = targetGroup;
+            BusyMessage = "Đang lưu vào CSDL...";
+            var state = ToState();
+            await Task.Run(() => _store.Save(state)).ConfigureAwait(true);
+        });
+
+        StatusMessage =
+            $"Đã nhập đợt \"{session.Name}\" ({session.Shooters.Count} người) vào nhóm \"{targetGroup.Name}\"";
+        return session;
+    }
+
+    public async Task ImportSessionAppendAsync(SessionTransferFile pack, ShootingSession target)
+    {
+        var localPreset = GetPresetForSession(target)
+            ?? throw new InvalidOperationException("Đợt đích chưa gắn cấu hình bia.");
+        if (!localPreset.SameConfigurationAs(pack.Preset))
+            throw new InvalidOperationException(
+                "Cấu hình bia của đợt hiện tại không khớp với file. Chỉ nối khi preset cùng cấu hình.");
+
+        var added = 0;
+        await RunBusyAsync("Đang nối đợt bắn...", async () =>
+        {
+            // Giữ nguyên thứ tự hiện tại rồi nối người từ file vào cuối.
+            var existingOrder = 1;
+            foreach (var existing in target.Shooters)
+                existing.Order = existingOrder++;
+
+            var startOrder = target.Shooters.Count + 1;
+            foreach (var shooter in RemintShooters(pack.Session.Shooters, localPreset, startOrder))
+            {
+                target.Shooters.Add(shooter);
+                added++;
+            }
+
+            SelectedSession = target;
+            BusyMessage = "Đang lưu vào CSDL...";
+            var state = ToState();
+            await Task.Run(() => _store.Save(state)).ConfigureAwait(true);
+        });
+
+        StatusMessage =
+            $"Đã nối {added} người vào đợt \"{target.Name}\" (tổng {target.Shooters.Count})";
+    }
+
+    private static IEnumerable<Shooter> RemintShooters(
+        IEnumerable<Shooter> source,
+        ScorePreset preset,
+        int startOrder)
+    {
+        var rounds = preset.GetRoundCounts();
+        var order = startOrder;
+        foreach (var s in source)
+        {
+            var clone = new Shooter
+            {
+                Id = Guid.NewGuid(),
+                Name = s.Name,
+                Rank = s.Rank,
+                Position = s.Position,
+                Unit = s.Unit,
+                Order = order++,
+                IsSelected = false,
+                Shots = s.Shots.Select(row => row.ToList()).ToList()
+            };
+            clone.EnsureShotMatrix(rounds);
+            yield return clone;
+        }
     }
 
     public ScorePreset CreateDefaultPreset(string name)
