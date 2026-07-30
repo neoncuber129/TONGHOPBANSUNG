@@ -19,6 +19,15 @@ function looksLikePersonNameList(parts: string[]): boolean {
   return parts.length > 4
 }
 
+/** Tách văn bản dán thành lưới ô như Excel (tab hoặc dấu chấm phẩy). */
+export function parseRosterGrid(text: string | null | undefined): string[][] {
+  if (!text || !text.trim()) return []
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+  // Ô trống giữa vùng dán phải giữ nguyên dòng để không lệch hàng; chỉ bỏ dòng thừa ở cuối.
+  while (lines.length > 0 && !lines[lines.length - 1].trim()) lines.pop()
+  return lines.map((line) => line.split(/[\t;]/).map((cell) => cell.trim()))
+}
+
 export function parseRosterEntries(text: string | null | undefined): RosterEntry[] {
   if (!text || !text.trim()) return []
 

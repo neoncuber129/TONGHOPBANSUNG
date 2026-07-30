@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { classify, knockDownCount, progressLabel, totalScore } from '../domain/scoreCalculator'
-import { parseRosterEntries } from '../domain/rosterParser'
+import { parseRosterEntries, parseRosterGrid } from '../domain/rosterParser'
 import {
   TargetKind,
   createEmptyShooter,
@@ -13,6 +13,13 @@ import {
 import { exportReport } from '../export/excelExport'
 import { useApp } from '../state/AppContext'
 import { Modal } from './Modal'
+
+const ROSTER_FIELDS = ['name', 'rank', 'position', 'unit'] as const
+
+interface PasteCell {
+  row: number
+  col: number
+}
 
 export function ScoreEntryTab() {
   const {
@@ -44,7 +51,7 @@ export function ScoreEntryTab() {
   const [search, setSearch] = useState('')
   const [onlySelected, setOnlySelected] = useState(false)
   const [addCount, setAddCount] = useState<number | ''>(5)
-  const pasteStartRef = useRef(0)
+  const pasteStartRef = useRef<PasteCell>({ row: 0, col: 0 })
   const importFileRef = useRef<HTMLInputElement>(null)
 
   const group = selectedSession
@@ -71,29 +78,39 @@ export function ScoreEntryTab() {
     updateSessionShooters(selectedSession.id, mutator([...selectedSession.shooters]))
   }
 
-  function handlePaste(text: string) {
+  function handlePaste(text: string, start: PasteCell) {
     if (!selectedSession || !preset) return
-    const entries = parseRosterEntries(text)
-    if (entries.length === 0) return
+    const startCol = Math.min(Math.max(start.col, 0), ROSTER_FIELDS.length - 1)
+    const grid =
+      startCol === 0
+        ? parseRosterEntries(text).map((e) => [e.name, e.rank, e.position, e.unit])
+        : parseRosterGrid(text)
+    if (grid.length === 0) return
     const rounds = getRoundCounts(preset)
     patchShooters((list) => {
       const next = [...list]
-      let row = pasteStartRef.current
-      for (const e of entries) {
+      let row = Math.max(0, start.row)
+      for (const cells of grid) {
         while (row >= next.length) {
           next.push(createEmptyShooter(next.length + 1, rounds))
         }
-        next[row] = {
-          ...next[row],
-          name: e.name,
-          rank: e.rank || next[row].rank,
-          position: e.position || next[row].position,
-          unit: e.unit || next[row].unit,
-        }
+        const shooter = { ...next[row] }
+        cells.forEach((value, i) => {
+          const field = ROSTER_FIELDS[startCol + i]
+          if (!field) return
+          if (field === 'name' || value) shooter[field] = value
+        })
+        next[row] = shooter
         row++
       }
       return next.map((s, i) => ({ ...s, order: i + 1 }))
     })
+  }
+
+  function pasteCellFromEvent(e: React.ClipboardEvent<HTMLElement>): PasteCell {
+    const cell = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-paste-row]')
+    if (!cell) return pasteStartRef.current
+    return { row: Number(cell.dataset.pasteRow), col: Number(cell.dataset.pasteCol) }
   }
 
   async function handleExport() {
@@ -319,8 +336,9 @@ export function ScoreEntryTab() {
             onPaste={(e) => {
               const text = e.clipboardData.getData('text')
               if (text) {
+                const cell = pasteCellFromEvent(e)
                 e.preventDefault()
-                handlePaste(text)
+                handlePaste(text, cell)
               }
             }}
           >
@@ -365,8 +383,10 @@ export function ScoreEntryTab() {
                         <input
                           className="cell-input"
                           value={s.name}
+                          data-paste-row={absIndex}
+                          data-paste-col={0}
                           onFocus={() => {
-                            pasteStartRef.current = absIndex
+                            pasteStartRef.current = { row: absIndex, col: 0 }
                           }}
                           onChange={(e) =>
                             updateShooter(selectedSession.id, {
@@ -376,13 +396,15 @@ export function ScoreEntryTab() {
                           }
                         />
                       </td>
-                      {(['rank', 'position', 'unit'] as const).map((field) => (
+                      {(['rank', 'position', 'unit'] as const).map((field, fi) => (
                         <td key={field}>
                           <input
                             className="cell-input"
                             value={s[field]}
+                            data-paste-row={absIndex}
+                            data-paste-col={fi + 1}
                             onFocus={() => {
-                              pasteStartRef.current = absIndex
+                              pasteStartRef.current = { row: absIndex, col: fi + 1 }
                             }}
                             onChange={(e) =>
                               updateShooter(selectedSession.id, {
@@ -425,8 +447,9 @@ export function ScoreEntryTab() {
             onPaste={(e) => {
               const text = e.clipboardData.getData('text')
               if (text) {
+                const cell = pasteCellFromEvent(e)
                 e.preventDefault()
-                handlePaste(text)
+                handlePaste(text, cell)
               }
             }}
           >
@@ -449,37 +472,28 @@ export function ScoreEntryTab() {
                     <span className="shooter-card-stt">#{absIndex + 1}</span>
                   </div>
                   <div className="shooter-card-fields">
-                    <input
-                      value={s.name}
-                      placeholder="Họ tên"
-                      onFocus={() => {
-                        pasteStartRef.current = absIndex
-                      }}
-                      onChange={(e) =>
-                        updateShooter(selectedSession.id, { ...s, name: e.target.value })
-                      }
-                    />
-                    <input
-                      value={s.rank}
-                      placeholder="Cấp bậc"
-                      onChange={(e) =>
-                        updateShooter(selectedSession.id, { ...s, rank: e.target.value })
-                      }
-                    />
-                    <input
-                      value={s.position}
-                      placeholder="Chức vụ"
-                      onChange={(e) =>
-                        updateShooter(selectedSession.id, { ...s, position: e.target.value })
-                      }
-                    />
-                    <input
-                      value={s.unit}
-                      placeholder="Đơn vị"
-                      onChange={(e) =>
-                        updateShooter(selectedSession.id, { ...s, unit: e.target.value })
-                      }
-                    />
+                    {(
+                      [
+                        ['name', 'Họ tên'],
+                        ['rank', 'Cấp bậc'],
+                        ['position', 'Chức vụ'],
+                        ['unit', 'Đơn vị'],
+                      ] as const
+                    ).map(([field, placeholder], fi) => (
+                      <input
+                        key={field}
+                        value={s[field]}
+                        placeholder={placeholder}
+                        data-paste-row={absIndex}
+                        data-paste-col={fi}
+                        onFocus={() => {
+                          pasteStartRef.current = { row: absIndex, col: fi }
+                        }}
+                        onChange={(e) =>
+                          updateShooter(selectedSession.id, { ...s, [field]: e.target.value })
+                        }
+                      />
+                    ))}
                   </div>
                   <div className="shooter-card-meta">
                     <span>
