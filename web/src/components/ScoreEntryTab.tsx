@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { classify, knockDownCount, progressLabel, totalScore } from '../domain/scoreCalculator'
+import { classify, knockDownCount, progressLabel, scoreValueCounts, totalScore } from '../domain/scoreCalculator'
 import { parseRosterEntries, parseRosterGrid } from '../domain/rosterParser'
 import {
   TargetKind,
@@ -828,6 +828,7 @@ function ScorePadDialog({
 
   const liveTotal = totalScore(draft, preset)
   const liveClass = classify(draft, preset)
+  const valueCounts = scoreValueCounts(draft, preset)
 
   let offset = 0
   return (
@@ -838,9 +839,21 @@ function ScorePadDialog({
       footer={
         <div className="pad-footer">
           <div className="pad-summary">
-            <span className="pad-summary-label">Tổng điểm</span>
-            <strong className="pad-summary-total">{liveTotal}</strong>
-            {liveClass ? <span className="pad-summary-class">{liveClass}</span> : null}
+            {valueCounts.length > 0 ? (
+              <div className="pad-value-counts" aria-label="Số lượng từng điểm">
+                {valueCounts.map(({ value, count }) => (
+                  <span key={value} className="pad-value-count">
+                    <em>{value}</em>
+                    <span>×{count}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="pad-summary-main">
+              <span className="pad-summary-label">Tổng điểm</span>
+              <strong className="pad-summary-total">{liveTotal}</strong>
+              {liveClass ? <span className="pad-summary-class">{liveClass}</span> : null}
+            </div>
           </div>
           <div className="row-actions">
             <button
@@ -868,6 +881,16 @@ function ScorePadDialog({
       <div className="score-pad">
         <header className="pad-hero">
           <p className="pad-hero-name">{shooter.name.trim() || 'Chưa có tên'}</p>
+          {valueCounts.length > 0 ? (
+            <div className="pad-value-counts" aria-label="Số lượng từng điểm">
+              {valueCounts.map(({ value, count }) => (
+                <span key={value} className="pad-value-count">
+                  <em>{value}</em>
+                  <span>×{count}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
           <p className="pad-hero-total">
             <span className="pad-hero-total-label">Tổng</span>
             <strong>{liveTotal}</strong>

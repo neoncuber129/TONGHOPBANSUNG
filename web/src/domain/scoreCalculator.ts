@@ -94,6 +94,25 @@ export function enteredShotCount(shooter: Shooter): number {
   return shooter.shots.flat().filter((s) => s !== null).length
 }
 
+/** Đếm số lần từng điểm chấm (0–10), bỏ ô trống và bia đổ. */
+export function scoreValueCounts(
+  shooter: Shooter,
+  preset: ScorePreset,
+): { value: number; count: number }[] {
+  const flat = flatTargets(preset)
+  const map = new Map<number, number>()
+  for (let i = 0; i < flat.length && i < shooter.shots.length; i++) {
+    if (flat[i].kind === TargetKind.KnockDown) continue
+    for (const s of shooter.shots[i] ?? []) {
+      if (s === null) continue
+      map.set(s, (map.get(s) ?? 0) + 1)
+    }
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([value, count]) => ({ value, count }))
+}
+
 export function progressLabel(shooter: Shooter, preset: ScorePreset): string {
   const totalSlots = flatTargets(preset).reduce(
     (n, t) => n + (t.kind === TargetKind.KnockDown ? 1 : Math.max(1, t.roundCount)),

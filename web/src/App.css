@@ -824,16 +824,22 @@ select {
 }
 
 .pad-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.35rem 0.75rem;
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
   padding: 0.85rem 1rem;
   background: #e7f0ea;
   border-radius: 10px;
   border: 1px solid #c5d5ca;
   text-align: center;
+}
+
+.pad-summary-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35rem 0.75rem;
 }
 
 .pad-summary-label {
@@ -863,6 +869,43 @@ select {
   font-weight: 500;
 }
 
+.pad-value-counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 0.45rem;
+  margin: 0.55rem 0 0;
+}
+
+.pad-summary .pad-value-counts {
+  margin: 0;
+}
+
+.pad-value-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.12rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #c5d5ca;
+  font-size: clamp(0.95rem, 2.6vw, 1.1rem);
+  font-weight: 700;
+  color: var(--accent-dark);
+  line-height: 1.2;
+}
+
+.pad-value-count em {
+  font-style: normal;
+  font-size: 1.15em;
+  font-weight: 800;
+}
+
+.pad-value-count span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .pad-hero {
   text-align: center;
   margin: 0 0 1rem;
@@ -883,7 +926,7 @@ select {
 }
 
 .pad-hero-total {
-  margin: 0.55rem 0 0;
+  margin: 0.45rem 0 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
