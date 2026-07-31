@@ -377,48 +377,52 @@ select {
   background: rgba(20, 30, 24, 0.45);
   display: grid;
   place-items: center;
-  padding: 1rem;
   z-index: 40;
-  padding-top: calc(1rem + var(--safe-top));
-  padding-bottom: calc(1rem + var(--safe-bottom));
+  --modal-gap: clamp(0.5rem, 2.2vw, 1.5rem);
+  padding: calc(var(--modal-gap) + var(--safe-top))
+    calc(var(--modal-gap) + var(--safe-right))
+    calc(var(--modal-gap) + var(--safe-bottom))
+    calc(var(--modal-gap) + var(--safe-left));
+  box-sizing: border-box;
 }
 
 .modal {
-  width: min(560px, 100%);
-  max-height: min(90dvh, 900px);
+  width: min(36rem, 100%);
+  max-width: 100%;
+  max-height: calc(100dvh - 2 * var(--modal-gap) - var(--safe-top) - var(--safe-bottom));
   overflow: hidden;
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: clamp(12px, 1.5vw, 16px);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
 }
 
 .modal-with-footer {
-  height: min(90dvh, 900px);
-  max-height: min(90dvh, 900px);
+  height: min(92dvh, calc(100dvh - 2 * var(--modal-gap) - var(--safe-top) - var(--safe-bottom)));
+  max-height: calc(100dvh - 2 * var(--modal-gap) - var(--safe-top) - var(--safe-bottom));
 }
 
 .modal-wide {
-  width: min(920px, 100%);
+  width: min(96vw, 72rem);
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.9rem 1rem;
+  padding: clamp(0.7rem, 1.5vw, 0.95rem) clamp(0.85rem, 2vw, 1.15rem);
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: clamp(1.05rem, 2.4vw, 1.25rem);
 }
 
 .modal-body {
-  padding: 1rem;
+  padding: clamp(0.75rem, 2vw, 1.15rem);
   overflow: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -431,7 +435,8 @@ select {
   background: rgba(247, 250, 247, 0.98);
   backdrop-filter: blur(8px);
   box-shadow: 0 -6px 18px rgba(28, 43, 34, 0.08);
-  padding: 0.75rem 1rem calc(0.75rem + var(--safe-bottom));
+  padding: clamp(0.65rem, 1.5vw, 0.85rem) clamp(0.85rem, 2vw, 1.15rem)
+    calc(clamp(0.65rem, 1.5vw, 0.85rem) + var(--safe-bottom));
 }
 
 .modal-footer .pad-footer {
@@ -819,14 +824,98 @@ select {
 }
 
 .pad-summary {
-  padding: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.85rem 1rem;
   background: #e7f0ea;
   border-radius: 10px;
   border: 1px solid #c5d5ca;
+  text-align: center;
 }
 
-.pad-summary strong {
+.pad-summary-label {
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.pad-summary-total {
+  font-size: clamp(1.75rem, 5vw, 2.4rem);
+  line-height: 1;
   color: var(--accent-dark);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.pad-summary-class {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.pad-summary-class::before {
+  content: '·';
+  margin-right: 0.55rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.pad-hero {
+  text-align: center;
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem 1rem;
+  background: linear-gradient(180deg, #eaf3ed, #f7faf7);
+  border: 1px solid #c5d5ca;
+  border-radius: 14px;
+}
+
+.pad-hero-name {
+  margin: 0;
+  font-size: clamp(1.45rem, 4.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--accent-dark);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.pad-hero-total {
+  margin: 0.55rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35rem 0.65rem;
+}
+
+.pad-hero-total-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pad-hero-total strong {
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--accent-dark);
+}
+
+.pad-hero-class {
+  font-size: clamp(1.05rem, 3vw, 1.25rem);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.pad-hero-class::before {
+  content: '·';
+  margin-right: 0.5rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .pad-footer {
@@ -899,6 +988,21 @@ select {
 
   .toolbar-scroll > * {
     flex-shrink: 0;
+  }
+
+  .modal-backdrop {
+    --modal-gap: clamp(0.4rem, 1.5vw, 0.85rem);
+  }
+
+  .modal,
+  .modal-wide {
+    width: min(98vw, 100%);
+    max-height: calc(100dvh - 2 * var(--modal-gap) - var(--safe-top) - var(--safe-bottom));
+  }
+
+  .modal-with-footer {
+    height: calc(100dvh - 2 * var(--modal-gap) - var(--safe-top) - var(--safe-bottom));
+    max-height: calc(100dvh - 2 * var(--modal-gap) - var(--safe-top) - var(--safe-bottom));
   }
 }
 

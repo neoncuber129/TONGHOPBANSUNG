@@ -832,19 +832,15 @@ function ScorePadDialog({
   let offset = 0
   return (
     <Modal
-      title={`Nhập điểm — ${shooter.name || 'Chưa có tên'}`}
+      title="Nhập điểm"
       onClose={onCancel}
       wide
       footer={
         <div className="pad-footer">
           <div className="pad-summary">
-            Tổng: <strong>{liveTotal}</strong>
-            {liveClass ? (
-              <>
-                {' '}
-                · Xếp loại: <strong>{liveClass}</strong>
-              </>
-            ) : null}
+            <span className="pad-summary-label">Tổng điểm</span>
+            <strong className="pad-summary-total">{liveTotal}</strong>
+            {liveClass ? <span className="pad-summary-class">{liveClass}</span> : null}
           </div>
           <div className="row-actions">
             <button
@@ -870,6 +866,14 @@ function ScorePadDialog({
       }
     >
       <div className="score-pad">
+        <header className="pad-hero">
+          <p className="pad-hero-name">{shooter.name.trim() || 'Chưa có tên'}</p>
+          <p className="pad-hero-total">
+            <span className="pad-hero-total-label">Tổng</span>
+            <strong>{liveTotal}</strong>
+            {liveClass ? <span className="pad-hero-class">{liveClass}</span> : null}
+          </p>
+        </header>
         {preset.clusters.map((cluster, ci) => {
           const start = offset
           offset += cluster.targets.length
