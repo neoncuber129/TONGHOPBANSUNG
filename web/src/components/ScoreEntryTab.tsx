@@ -792,11 +792,10 @@ export function ScoreEntryTab() {
           </div>
 
           <p className="hint hint-desktop">
-            Gợi ý: dán (Ctrl+V) danh sách từ Excel vào ô Họ tên — cột: Họ tên, Cấp bậc, Chức vụ, Đơn
-            vị.
+            Gợi ý: Ctrl+V từ Excel vào Họ tên (Họ tên · Cấp bậc · Chức vụ · Đơn vị).
           </p>
           <p className="hint hint-mobile">
-            Gợi ý: chạm vào ô Họ tên rồi dán danh sách — cột: Họ tên, Cấp bậc, Chức vụ, Đơn vị.
+            Gợi ý: chạm ô Họ tên rồi dán danh sách (Họ tên · Cấp bậc · Chức vụ · Đơn vị).
           </p>
         </>
       )}
