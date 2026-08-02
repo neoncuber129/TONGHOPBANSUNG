@@ -278,12 +278,19 @@ select {
   opacity: 0.85;
 }
 
-.score-tab > .hint {
+.roster-hint {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.65rem;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 1.25em;
-  margin-top: -0.45rem;
+  border-top: 1px solid var(--line);
+  background: #eef3ef;
 }
 
 .hint-desktop {

@@ -702,6 +702,9 @@ export function ScoreEntryTab() {
                 })}
               </tbody>
             </table>
+            <p className="hint hint-desktop roster-hint">
+              Gợi ý: Ctrl+V từ Excel vào Họ tên (Họ tên · Cấp bậc · Chức vụ · Đơn vị).
+            </p>
           </div>
 
           <div
@@ -789,14 +792,10 @@ export function ScoreEntryTab() {
                 </article>
               )
             })}
+            <p className="hint hint-mobile roster-hint">
+              Gợi ý: chạm ô Họ tên rồi dán danh sách (Họ tên · Cấp bậc · Chức vụ · Đơn vị).
+            </p>
           </div>
-
-          <p className="hint hint-desktop">
-            Gợi ý: Ctrl+V từ Excel vào Họ tên (Họ tên · Cấp bậc · Chức vụ · Đơn vị).
-          </p>
-          <p className="hint hint-mobile">
-            Gợi ý: chạm ô Họ tên rồi dán danh sách (Họ tên · Cấp bậc · Chức vụ · Đơn vị).
-          </p>
         </>
       )}
 
