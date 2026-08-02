@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { classify, knockDownCount, progressLabel, scoreValueCounts, totalScore } from '../domain/scoreCalculator'
 import { parseRosterEntries, parseRosterGrid } from '../domain/rosterParser'
 import {
@@ -53,6 +53,15 @@ export function ScoreEntryTab() {
   const [addCount, setAddCount] = useState<number | ''>(5)
   const pasteStartRef = useRef<PasteCell>({ row: 0, col: 0 })
   const importFileRef = useRef<HTMLInputElement>(null)
+  const undoStackRef = useRef<Shooter[][]>([])
+  const editBaselineRef = useRef<Shooter[] | null>(null)
+  const editPushedRef = useRef(false)
+
+  useEffect(() => {
+    undoStackRef.current = []
+    editBaselineRef.current = null
+    editPushedRef.current = false
+  }, [selectedSession?.id])
 
   const group = selectedSession
     ? state.groups.find((g) => g.id === selectedSession.groupId) ?? null
@@ -73,23 +82,64 @@ export function ScoreEntryTab() {
 
   const scoringShooter = selectedSession?.shooters.find((s) => s.id === scoreShooterId) ?? null
 
+  function pushUndo(snapshot?: Shooter[]) {
+    if (!selectedSession) return
+    const snap = structuredClone(snapshot ?? selectedSession.shooters)
+    undoStackRef.current.push(snap)
+    if (undoStackRef.current.length > 40) undoStackRef.current.shift()
+  }
+
+  function undoRoster() {
+    if (!selectedSession) return
+    const prev = undoStackRef.current.pop()
+    if (!prev) return
+    // Chỉ hoàn tác thông tin/danh sách — giữ điểm hiện tại theo id.
+    const currentShots = new Map(selectedSession.shooters.map((s) => [s.id, s.shots]))
+    const restored = prev.map((s) => ({
+      ...s,
+      shots: currentShots.get(s.id) ?? s.shots,
+    }))
+    updateSessionShooters(selectedSession.id, restored)
+  }
+
+  function beginFieldEdit() {
+    if (!selectedSession) return
+    editBaselineRef.current = structuredClone(selectedSession.shooters)
+    editPushedRef.current = false
+  }
+
+  function ensureEditUndo() {
+    if (editPushedRef.current || !editBaselineRef.current) return
+    pushUndo(editBaselineRef.current)
+    editPushedRef.current = true
+  }
+
   function patchShooters(mutator: (list: Shooter[]) => Shooter[]) {
     if (!selectedSession) return
+    pushUndo()
     updateSessionShooters(selectedSession.id, mutator([...selectedSession.shooters]))
+  }
+
+  function handleRosterKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.altKey || e.shiftKey) return
+    e.preventDefault()
+    undoRoster()
   }
 
   function handlePaste(text: string, start: PasteCell) {
     if (!selectedSession || !preset) return
     const startCol = Math.min(Math.max(start.col, 0), ROSTER_FIELDS.length - 1)
+    const startRow = Math.max(0, start.row)
     const grid =
       startCol === 0
         ? parseRosterEntries(text).map((e) => [e.name, e.rank, e.position, e.unit])
         : parseRosterGrid(text)
     if (grid.length === 0) return
     const rounds = getRoundCounts(preset)
+    pasteStartRef.current = { row: startRow, col: startCol }
     patchShooters((list) => {
       const next = [...list]
-      let row = Math.max(0, start.row)
+      let row = startRow
       for (const cells of grid) {
         while (row >= next.length) {
           next.push(createEmptyShooter(next.length + 1, rounds))
@@ -105,12 +155,22 @@ export function ScoreEntryTab() {
       }
       return next.map((s, i) => ({ ...s, order: i + 1 }))
     })
+    // Giữ focus đúng ô vừa dán — tránh nhảy về cột Họ tên sau re-render.
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-paste-row="${startRow}"][data-paste-col="${startCol}"]`,
+      )
+      el?.focus()
+    })
   }
 
   function pasteCellFromEvent(e: React.ClipboardEvent<HTMLElement>): PasteCell {
     const cell = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-paste-row]')
     if (!cell) return pasteStartRef.current
-    return { row: Number(cell.dataset.pasteRow), col: Number(cell.dataset.pasteCol) }
+    const row = Number(cell.dataset.pasteRow)
+    const col = Number(cell.dataset.pasteCol)
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return pasteStartRef.current
+    return { row, col }
   }
 
   async function handleExport() {
@@ -333,6 +393,8 @@ export function ScoreEntryTab() {
 
           <div
             className="table-wrap"
+            tabIndex={-1}
+            onKeyDown={handleRosterKeyDown}
             onPaste={(e) => {
               const text = e.clipboardData.getData('text')
               if (text) {
@@ -387,13 +449,15 @@ export function ScoreEntryTab() {
                           data-paste-col={0}
                           onFocus={() => {
                             pasteStartRef.current = { row: absIndex, col: 0 }
+                            beginFieldEdit()
                           }}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            ensureEditUndo()
                             updateShooter(selectedSession.id, {
                               ...s,
                               name: e.target.value,
                             })
-                          }
+                          }}
                         />
                       </td>
                       {(['rank', 'position', 'unit'] as const).map((field, fi) => (
@@ -405,13 +469,15 @@ export function ScoreEntryTab() {
                             data-paste-col={fi + 1}
                             onFocus={() => {
                               pasteStartRef.current = { row: absIndex, col: fi + 1 }
+                              beginFieldEdit()
                             }}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              ensureEditUndo()
                               updateShooter(selectedSession.id, {
                                 ...s,
                                 [field]: e.target.value,
                               })
-                            }
+                            }}
                           />
                         </td>
                       ))}
@@ -444,6 +510,8 @@ export function ScoreEntryTab() {
 
           <div
             className="card-list"
+            tabIndex={-1}
+            onKeyDown={handleRosterKeyDown}
             onPaste={(e) => {
               const text = e.clipboardData.getData('text')
               if (text) {
@@ -488,10 +556,12 @@ export function ScoreEntryTab() {
                         data-paste-col={fi}
                         onFocus={() => {
                           pasteStartRef.current = { row: absIndex, col: fi }
+                          beginFieldEdit()
                         }}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          ensureEditUndo()
                           updateShooter(selectedSession.id, { ...s, [field]: e.target.value })
-                        }
+                        }}
                       />
                     ))}
                   </div>

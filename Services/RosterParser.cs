@@ -90,6 +90,35 @@ public static class RosterParser
     public static List<string> Parse(string? text) =>
         ParseEntries(text).Select(e => e.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
 
+    /// <summary>
+    /// Tách văn bản dán thành lưới ô như Excel (tab hoặc ;).
+    /// Giữ dòng trống giữa vùng dán để không lệch hàng; bỏ dòng thừa ở cuối.
+    /// </summary>
+    public static List<string[]> ParseGrid(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return [];
+
+        var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').ToList();
+        while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[^1]))
+            lines.RemoveAt(lines.Count - 1);
+
+        return lines
+            .Select(line => line.Split(['\t', ';'], StringSplitOptions.None)
+                .Select(cell => cell.Trim())
+                .ToArray())
+            .ToList();
+    }
+
+    public static bool LooksLikeSpreadsheetPaste(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        return text.Contains('\t')
+               || text.Contains(';')
+               || text.Contains('\n')
+               || text.Contains('\r');
+    }
+
     private static bool LooksLikePersonNameList(string[] parts) =>
         parts.Length > 4;
 

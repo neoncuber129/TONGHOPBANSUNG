@@ -319,6 +319,9 @@ public partial class ScoreEntryViewModel : ObservableObject
     private readonly System.Windows.Threading.DispatcherTimer _searchTimer;
     private Guid? _loadedSessionId;
     private string _headerSignature = string.Empty;
+    private readonly List<List<Shooter>> _rosterUndoStack = new();
+    private List<Shooter>? _pendingCellEditUndo;
+    private const int MaxRosterUndo = 40;
 
     public ObservableCollection<ShootingSession> Sessions => _session.Sessions;
     public ObservableCollection<ShooterRowViewModel> AllRows { get; } = new();
@@ -644,6 +647,9 @@ public partial class ScoreEntryViewModel : ObservableObject
             return;
         }
 
+        if (_loadedSessionId != SelectedSession.Id)
+            ClearRosterUndo();
+
         AllRows.Clear();
         var index = 1;
         foreach (var shooter in SelectedSession.Shooters.OrderBy(s => s.Order))
@@ -655,23 +661,42 @@ public partial class ScoreEntryViewModel : ObservableObject
 
     public void RefreshRowsPublic() => ReloadSessionRows(force: true);
 
-    public void PasteNamesFromClipboard(string clipboardText, int startRowIndex = 0)
+    /// <param name="startColumnIndex">0=Họ tên, 1=Cấp bậc, 2=Chức vụ, 3=Đơn vị.</param>
+    public void PasteNamesFromClipboard(
+        string clipboardText,
+        int startRowIndex = 0,
+        int startColumnIndex = 0)
     {
         if (SelectedSession is null) return;
 
-        var entries = RosterParser.ParseEntries(clipboardText);
-        if (entries.Count == 0) return;
+        startColumnIndex = Math.Clamp(startColumnIndex, 0, 3);
+        List<string[]> grid;
+        if (startColumnIndex == 0)
+        {
+            // Dán từ cột Họ tên: giữ parser thông minh (danh sách tên / CSV).
+            grid = RosterParser.ParseEntries(clipboardText)
+                .Select(e => new[] { e.Name, e.Rank, e.Position, e.Unit })
+                .ToList();
+        }
+        else
+        {
+            // Dán từ cột khác: lưới Excel đúng ô đang chọn, không nhảy về Họ tên.
+            grid = RosterParser.ParseGrid(clipboardText);
+        }
+
+        if (grid.Count == 0) return;
 
         var preset = _session.GetPresetForSession(SelectedSession);
         if (preset is null) return;
 
-        ApplyEntriesFromRow(entries, preset, Math.Max(0, startRowIndex));
+        PushRosterUndo();
+        ApplyGridFromCell(grid, preset, Math.Max(0, startRowIndex), startColumnIndex);
 
-        RenumberOrders();
         // Cập nhật dòng hiện có + thêm dòng mới, không rebuild toàn bộ
         SyncRowsAfterStructureChange(preset);
+        RenumberOrders();
         _session.PersistDeferred();
-        _session.StatusMessage = $"Đã dán {entries.Count} dòng";
+        _session.StatusMessage = $"Đã dán {grid.Count} dòng từ cột {startColumnIndex + 1}";
     }
 
     private void SyncRowsAfterStructureChange(ScorePreset preset)
@@ -700,11 +725,15 @@ public partial class ScoreEntryViewModel : ObservableObject
         ApplyFilter();
     }
 
-    private void ApplyEntriesFromRow(List<RosterEntry> entries, ScorePreset preset, int startRowIndex)
+    private void ApplyGridFromCell(
+        List<string[]> grid,
+        ScorePreset preset,
+        int startRowIndex,
+        int startColumnIndex)
     {
         var ordered = SelectedSession!.Shooters.OrderBy(s => s.Order).ToList();
 
-        while (ordered.Count < startRowIndex + entries.Count)
+        while (ordered.Count < startRowIndex + grid.Count)
         {
             var shooter = _session.CreateEmptyShooterForSession(SelectedSession, ordered.Count + 1);
             SelectedSession.Shooters.Add(shooter);
@@ -712,17 +741,32 @@ public partial class ScoreEntryViewModel : ObservableObject
         }
 
         var rounds = preset.GetRoundCounts();
-        for (var i = 0; i < entries.Count; i++)
+        for (var i = 0; i < grid.Count; i++)
         {
             var row = ordered[startRowIndex + i];
-            var entry = entries[i];
-            row.Name = entry.Name;
-            if (!string.IsNullOrWhiteSpace(entry.Rank))
-                row.Rank = entry.Rank;
-            if (!string.IsNullOrWhiteSpace(entry.Position))
-                row.Position = entry.Position;
-            if (!string.IsNullOrWhiteSpace(entry.Unit))
-                row.Unit = entry.Unit;
+            var cells = grid[i];
+            for (var c = 0; c < cells.Length; c++)
+            {
+                var fieldIndex = startColumnIndex + c;
+                if (fieldIndex > 3) break;
+                var value = cells[c] ?? string.Empty;
+                switch (fieldIndex)
+                {
+                    case 0:
+                        row.Name = value;
+                        break;
+                    case 1:
+                        if (value.Length > 0) row.Rank = value;
+                        break;
+                    case 2:
+                        if (value.Length > 0) row.Position = value;
+                        break;
+                    case 3:
+                        if (value.Length > 0) row.Unit = value;
+                        break;
+                }
+            }
+
             if (NeedsMatrixResize(row, rounds))
                 row.EnsureShotMatrix(rounds);
         }
@@ -765,6 +809,7 @@ public partial class ScoreEntryViewModel : ObservableObject
             : AllRows.OrderBy(r => r.Shooter.Order);
 
         var list = sorted.ToList();
+        PushRosterUndo();
         AllRows.Clear();
         foreach (var row in list)
             AllRows.Add(row);
@@ -836,6 +881,7 @@ public partial class ScoreEntryViewModel : ObservableObject
         var preset = _session.GetPresetForSession(SelectedSession);
         if (preset is null) return;
 
+        PushRosterUndo();
         var startIndex = AllRows.Count + 1;
         for (var i = 0; i < count; i++)
         {
@@ -868,13 +914,14 @@ public partial class ScoreEntryViewModel : ObservableObject
         }
 
         var ask = MessageBox.Show(
-            $"Xóa {toRemove.Count} dòng đã chọn?\nThao tác này không hoàn tác được.",
+            $"Xóa {toRemove.Count} dòng đã chọn?",
             "Xác nhận xóa dòng",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);
         if (ask != MessageBoxResult.Yes) return;
 
+        PushRosterUndo();
         await _session.RunBusyAsync("Đang xóa dòng...", async () =>
         {
             var removeSet = toRemove.ToHashSet();
@@ -900,6 +947,130 @@ public partial class ScoreEntryViewModel : ObservableObject
     }
 
     public void PersistEdits() => _session.PersistDeferred();
+
+    public void BeginCellEditUndo()
+    {
+        _pendingCellEditUndo = CaptureRosterSnapshot();
+    }
+
+    public void CommitCellEditUndo()
+    {
+        if (_pendingCellEditUndo is null) return;
+        if (!RosterEquals(_pendingCellEditUndo, CaptureRosterSnapshot()))
+            PushRosterUndoSnapshot(_pendingCellEditUndo);
+        _pendingCellEditUndo = null;
+    }
+
+    public void CancelCellEditUndo() => _pendingCellEditUndo = null;
+
+    public bool UndoRoster()
+    {
+        if (SelectedSession is null || _rosterUndoStack.Count == 0)
+            return false;
+
+        var snapshot = _rosterUndoStack[^1];
+        _rosterUndoStack.RemoveAt(_rosterUndoStack.Count - 1);
+        RestoreRosterSnapshot(snapshot);
+        _session.PersistDeferred();
+        _session.StatusMessage = "Đã hoàn tác";
+        return true;
+    }
+
+    public void PushRosterUndo()
+    {
+        var snapshot = CaptureRosterSnapshot();
+        if (snapshot is null) return;
+        PushRosterUndoSnapshot(snapshot);
+    }
+
+    private void PushRosterUndoSnapshot(List<Shooter> snapshot)
+    {
+        _rosterUndoStack.Add(snapshot);
+        while (_rosterUndoStack.Count > MaxRosterUndo)
+            _rosterUndoStack.RemoveAt(0);
+    }
+
+    private List<Shooter>? CaptureRosterSnapshot()
+    {
+        if (SelectedSession is null) return null;
+        return SelectedSession.Shooters
+            .OrderBy(s => s.Order)
+            .Select(CloneShooterState)
+            .ToList();
+    }
+
+    private void RestoreRosterSnapshot(List<Shooter> snapshot)
+    {
+        if (SelectedSession is null) return;
+
+        // Chỉ hoàn tác thông tin/danh sách — giữ điểm hiện tại theo Id xạ thủ.
+        var currentShots = SelectedSession.Shooters.ToDictionary(
+            s => s.Id,
+            s => s.Shots.Select(row => row.ToList()).ToList());
+
+        SelectedSession.Shooters.Clear();
+        foreach (var shooter in snapshot.Select(CloneShooterState))
+        {
+            if (currentShots.TryGetValue(shooter.Id, out var shots))
+                shooter.Shots = shots;
+            SelectedSession.Shooters.Add(shooter);
+        }
+
+        var preset = _session.GetPresetForSession(SelectedSession);
+        if (preset is null)
+        {
+            AllRows.Clear();
+            ApplyFilter();
+            return;
+        }
+
+        SyncRowsAfterStructureChange(preset);
+        RenumberOrders();
+    }
+
+    private void ClearRosterUndo()
+    {
+        _rosterUndoStack.Clear();
+        _pendingCellEditUndo = null;
+    }
+
+    private static Shooter CloneShooterState(Shooter s) => new()
+    {
+        Id = s.Id,
+        Name = s.Name,
+        Rank = s.Rank,
+        Position = s.Position,
+        Unit = s.Unit,
+        Order = s.Order,
+        IsSelected = s.IsSelected,
+        Shots = s.Shots.Select(row => row.ToList()).ToList()
+    };
+
+    private static bool RosterEquals(List<Shooter> a, List<Shooter>? b)
+    {
+        if (b is null || a.Count != b.Count) return false;
+        for (var i = 0; i < a.Count; i++)
+        {
+            var x = a[i];
+            var y = b[i];
+            if (x.Id != y.Id) return false;
+            if (!string.Equals(x.Name, y.Name, StringComparison.Ordinal)) return false;
+            if (!string.Equals(x.Rank, y.Rank, StringComparison.Ordinal)) return false;
+            if (!string.Equals(x.Position, y.Position, StringComparison.Ordinal)) return false;
+            if (!string.Equals(x.Unit, y.Unit, StringComparison.Ordinal)) return false;
+            if (x.Order != y.Order || x.IsSelected != y.IsSelected) return false;
+            if (x.Shots.Count != y.Shots.Count) return false;
+            for (var t = 0; t < x.Shots.Count; t++)
+            {
+                if (x.Shots[t].Count != y.Shots[t].Count) return false;
+                for (var r = 0; r < x.Shots[t].Count; r++)
+                {
+                    if (x.Shots[t][r] != y.Shots[t][r]) return false;
+                }
+            }
+        }
+        return true;
+    }
 
     [RelayCommand]
     private void OpenEntry(ShooterRowViewModel? row)

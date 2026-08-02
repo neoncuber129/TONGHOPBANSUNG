@@ -5,6 +5,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using Tonghopbansung.Models;
+using Tonghopbansung.Services;
 using Tonghopbansung.ViewModels;
 
 namespace Tonghopbansung.Views;
@@ -230,11 +231,20 @@ public partial class ScoreEntryView
         if (MainGrid.IsReadOnly) return;
         if (DataContext is not ScoreEntryViewModel vm) return;
 
-        // Đang sửa ô → để DataGrid xử lý
-        if (MainGrid.CurrentCell.IsValid && IsEditing())
-            return;
+        // Ctrl+Z hoàn tác thao tác danh sách (không cướp undo của TextBox đang sửa)
+        if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (IsEditing())
+                return;
 
-        // Ctrl+V dán như Excel
+            if (vm.UndoRoster())
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // Ctrl+V dán như Excel — luôn theo ô đang chọn, kể cả khi đang sửa ô
         if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
         {
             var header = MainGrid.CurrentColumn?.Header as string;
@@ -243,19 +253,45 @@ public partial class ScoreEntryView
                 var text = Clipboard.GetText();
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    var startIndex = GetCurrentRowIndex();
+                    // Một giá trị đơn trong lúc sửa ô → để TextBox dán bình thường
+                    if (IsEditing() && !RosterParser.LooksLikeSpreadsheetPaste(text))
+                        return;
+
+                    if (IsEditing())
+                    {
+                        try
+                        {
+                            MainGrid.CancelEdit(DataGridEditingUnit.Cell);
+                            MainGrid.CancelEdit(DataGridEditingUnit.Row);
+                        }
+                        catch
+                        {
+                            // bỏ qua nếu không hủy được
+                        }
+                    }
+
+                    var startIndex = GetCurrentAbsoluteRowIndex();
                     if (startIndex < 0) startIndex = 0;
-                    vm.PasteNamesFromClipboard(text, startIndex);
+                    var startColumn = GetEditableColumnIndex(header);
+                    var anchorItem = MainGrid.CurrentItem;
+                    var anchorColumn = MainGrid.CurrentColumn;
+
+                    vm.PasteNamesFromClipboard(text, startIndex, startColumn);
+                    RestoreCurrentCell(anchorItem, anchorColumn);
                     e.Handled = true;
                     return;
                 }
             }
         }
 
+        // Đang sửa ô → để DataGrid xử lý các phím khác
+        if (MainGrid.CurrentCell.IsValid && IsEditing())
+            return;
+
         // Delete / Backspace: xóa nội dung ô đang chọn (không xóa cả dòng)
         if (e.Key is Key.Delete or Key.Back)
         {
-            if (ClearSelectedEditableCells())
+            if (ClearSelectedEditableCells(pushUndo: true))
             {
                 vm.PersistEdits();
                 e.Handled = true;
@@ -296,6 +332,9 @@ public partial class ScoreEntryView
 
     private void MainGrid_OnPreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
+        if (DataContext is ScoreEntryViewModel vm)
+            vm.BeginCellEditUndo();
+
         if (e.EditingElement is TextBox tb)
         {
             tb.VerticalAlignment = VerticalAlignment.Stretch;
@@ -318,8 +357,14 @@ public partial class ScoreEntryView
 
     private void MainGrid_OnCellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
     {
-        if (DataContext is ScoreEntryViewModel vm)
-            vm.PersistEdits();
+        if (DataContext is not ScoreEntryViewModel vm) return;
+
+        if (e.EditAction == DataGridEditAction.Cancel)
+            vm.CancelCellEditUndo();
+        else
+            vm.CommitCellEditUndo();
+
+        vm.PersistEdits();
     }
 
     private void MainGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e)
@@ -355,10 +400,44 @@ public partial class ScoreEntryView
         return source as DataGridColumnHeader;
     }
 
-    private int GetCurrentRowIndex()
+    /// <summary>Chỉ số dòng trong danh sách đầy đủ (theo Order), không phải view đã lọc.</summary>
+    private int GetCurrentAbsoluteRowIndex()
     {
-        if (MainGrid.CurrentItem is null) return -1;
-        return MainGrid.Items.IndexOf(MainGrid.CurrentItem);
+        if (MainGrid.CurrentItem is not ShooterRowViewModel row) return -1;
+        if (DataContext is not ScoreEntryViewModel vm) return -1;
+        for (var i = 0; i < vm.AllRows.Count; i++)
+        {
+            if (vm.AllRows[i].Shooter.Id == row.Shooter.Id)
+                return i;
+        }
+        return -1;
+    }
+
+    private static int GetEditableColumnIndex(string header) => header switch
+    {
+        "Họ tên" => 0,
+        "Cấp bậc" => 1,
+        "Chức vụ" => 2,
+        "Đơn vị" => 3,
+        _ => 0
+    };
+
+    private void RestoreCurrentCell(object? item, DataGridColumn? column)
+    {
+        if (item is null || column is null) return;
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!MainGrid.Items.Contains(item)) return;
+            if (!MainGrid.Columns.Contains(column)) return;
+
+            var cell = new DataGridCellInfo(item, column);
+            MainGrid.CurrentCell = cell;
+            MainGrid.SelectedCells.Clear();
+            MainGrid.SelectedCells.Add(cell);
+            MainGrid.ScrollIntoView(item, column);
+            MainGrid.Focus();
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private bool CanEditCurrentCell()
@@ -387,7 +466,7 @@ public partial class ScoreEntryView
         }
     }
 
-    private bool ClearSelectedEditableCells()
+    private bool ClearSelectedEditableCells(bool pushUndo = false)
     {
         var cleared = false;
         var cells = MainGrid.SelectedCells.Count > 0
@@ -396,13 +475,23 @@ public partial class ScoreEntryView
                 ? [MainGrid.CurrentCell]
                 : [];
 
+        List<(ShooterRowViewModel Row, string Header)> targets = [];
         foreach (var cellInfo in cells)
         {
             if (cellInfo.Column is null || cellInfo.Column.IsReadOnly) continue;
             if (cellInfo.Column.Header is not string header || !EditableInfoHeaders.Contains(header))
                 continue;
             if (cellInfo.Item is not ShooterRowViewModel row) continue;
+            targets.Add((row, header));
+        }
 
+        if (targets.Count == 0) return false;
+
+        if (pushUndo && DataContext is ScoreEntryViewModel vm)
+            vm.PushRosterUndo();
+
+        foreach (var (row, header) in targets)
+        {
             switch (header)
             {
                 case "Họ tên":
