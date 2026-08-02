@@ -271,7 +271,10 @@ select {
 
 .hint {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  margin: 0.35rem 0.75rem 0.5rem;
+  opacity: 0.9;
 }
 
 .hint-desktop {
@@ -667,6 +670,32 @@ select {
 
 .cell-input:focus {
   border-color: var(--accent) !important;
+  background: #fff !important;
+}
+
+.roster-select-table {
+  user-select: none;
+}
+
+.roster-select-table .cell-input {
+  user-select: text;
+}
+
+.roster-select-table td.cell-selected {
+  background: #c5d9f1 !important;
+  box-shadow: inset 0 0 0 1.5px #2f75b5;
+}
+
+.roster-select-table td.cell-selected.sticky-col-3 {
+  background: #c5d9f1 !important;
+}
+
+.roster-select-table td.cell-selected .cell-input {
+  background: transparent !important;
+}
+
+.roster-select-table td.cell-selected .cell-input:focus {
+  border-color: #2f75b5 !important;
   background: #fff !important;
 }
 

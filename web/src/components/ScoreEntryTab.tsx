@@ -21,6 +21,32 @@ interface PasteCell {
   col: number
 }
 
+/** Ô trong bảng đã lọc: row = index trong filtered, col = 0..3 thông tin. */
+interface ViewCell {
+  row: number
+  col: number
+}
+
+interface CellRange {
+  anchor: ViewCell
+  end: ViewCell
+}
+
+function normalizeRange(range: CellRange): { r0: number; r1: number; c0: number; c1: number } {
+  return {
+    r0: Math.min(range.anchor.row, range.end.row),
+    r1: Math.max(range.anchor.row, range.end.row),
+    c0: Math.min(range.anchor.col, range.end.col),
+    c1: Math.max(range.anchor.col, range.end.col),
+  }
+}
+
+function cellInRange(range: CellRange | null, row: number, col: number): boolean {
+  if (!range) return false
+  const { r0, r1, c0, c1 } = normalizeRange(range)
+  return row >= r0 && row <= r1 && col >= c0 && col <= c1
+}
+
 export function ScoreEntryTab() {
   const {
     state,
@@ -56,12 +82,43 @@ export function ScoreEntryTab() {
   const undoStackRef = useRef<Shooter[][]>([])
   const editBaselineRef = useRef<Shooter[] | null>(null)
   const editPushedRef = useRef(false)
+  const [cellRange, setCellRange] = useState<CellRange | null>(null)
+  const cellRangeRef = useRef<CellRange | null>(null)
+  const draggingSelectRef = useRef(false)
+  const dragMovedRef = useRef(false)
+  const suppressFocusRef = useRef(false)
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    cellRangeRef.current = cellRange
+  }, [cellRange])
 
   useEffect(() => {
     undoStackRef.current = []
     editBaselineRef.current = null
     editPushedRef.current = false
+    setCellRange(null)
   }, [selectedSession?.id])
+
+  useEffect(() => {
+    const endDrag = () => {
+      if (!draggingSelectRef.current) return
+      draggingSelectRef.current = false
+      const range = cellRangeRef.current
+      suppressFocusRef.current = false
+      if (!dragMovedRef.current && range) {
+        const { r0, c0 } = normalizeRange(range)
+        const el = document.querySelector<HTMLInputElement>(
+          `[data-view-row="${r0}"][data-view-col="${c0}"]`,
+        )
+        el?.focus()
+      } else {
+        tableWrapRef.current?.focus()
+      }
+    }
+    window.addEventListener('mouseup', endDrag)
+    return () => window.removeEventListener('mouseup', endDrag)
+  }, [])
 
   const group = selectedSession
     ? state.groups.find((g) => g.id === selectedSession.groupId) ?? null
@@ -121,9 +178,109 @@ export function ScoreEntryTab() {
   }
 
   function handleRosterKeyDown(e: React.KeyboardEvent<HTMLElement>) {
-    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.altKey || e.shiftKey) return
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.altKey && !e.shiftKey) {
+      e.preventDefault()
+      undoRoster()
+      return
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && !e.altKey) {
+      if (copySelectedCells()) {
+        e.preventDefault()
+      }
+      return
+    }
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Trong lúc gõ ô đơn: để xóa ký tự bình thường
+      const target = e.target as HTMLElement | null
+      const editing =
+        target instanceof HTMLInputElement &&
+        cellRange &&
+        cellRange.anchor.row === cellRange.end.row &&
+        cellRange.anchor.col === cellRange.end.col &&
+        document.activeElement === target
+      if (editing) return
+      if (clearSelectedCells()) {
+        e.preventDefault()
+      }
+    }
+  }
+
+  function absRowFromView(viewRow: number): number {
+    const shooter = filtered[viewRow]
+    if (!shooter || !selectedSession) return viewRow
+    return selectedSession.shooters.findIndex((x) => x.id === shooter.id)
+  }
+
+  function selectCell(view: ViewCell, extend: boolean) {
+    setCellRange((prev) => {
+      if (extend && prev) return { anchor: prev.anchor, end: view }
+      return { anchor: view, end: view }
+    })
+    pasteStartRef.current = {
+      row: absRowFromView(view.row),
+      col: view.col,
+    }
+  }
+
+  function beginCellSelect(e: React.MouseEvent, view: ViewCell) {
+    if (e.button !== 0) return
+    // Cho phép chọn vùng bằng kéo; tránh highlight text trình duyệt
     e.preventDefault()
-    undoRoster()
+    draggingSelectRef.current = true
+    dragMovedRef.current = false
+    suppressFocusRef.current = true
+    selectCell(view, e.shiftKey)
+  }
+
+  function extendCellSelect(view: ViewCell) {
+    if (!draggingSelectRef.current) return
+    dragMovedRef.current = true
+    setCellRange((prev) => (prev ? { anchor: prev.anchor, end: view } : { anchor: view, end: view }))
+  }
+
+  function clearSelectedCells(): boolean {
+    if (!selectedSession || !cellRange) return false
+    const { r0, r1, c0, c1 } = normalizeRange(cellRange)
+    pushUndo()
+    const next = selectedSession.shooters.map((s) => ({ ...s }))
+    for (let vr = r0; vr <= r1; vr++) {
+      const shooter = filtered[vr]
+      if (!shooter) continue
+      const idx = next.findIndex((x) => x.id === shooter.id)
+      if (idx < 0) continue
+      const updated = { ...next[idx] }
+      for (let c = c0; c <= c1; c++) {
+        const field = ROSTER_FIELDS[c]
+        if (field) updated[field] = ''
+      }
+      next[idx] = updated
+    }
+    updateSessionShooters(
+      selectedSession.id,
+      next.map((s, i) => ({ ...s, order: i + 1 })),
+    )
+    return true
+  }
+
+  function copySelectedCells(): boolean {
+    if (!selectedSession || !cellRange) return false
+    const { r0, r1, c0, c1 } = normalizeRange(cellRange)
+    const lines: string[] = []
+    for (let vr = r0; vr <= r1; vr++) {
+      const shooter = filtered[vr]
+      if (!shooter) continue
+      const cells: string[] = []
+      for (let c = c0; c <= c1; c++) {
+        const field = ROSTER_FIELDS[c]
+        cells.push(field ? shooter[field] : '')
+      }
+      lines.push(cells.join('\t'))
+    }
+    if (lines.length === 0) return false
+    void navigator.clipboard.writeText(lines.join('\n'))
+    return true
   }
 
   function handlePaste(text: string, start: PasteCell) {
@@ -392,19 +549,24 @@ export function ScoreEntryTab() {
           </div>
 
           <div
+            ref={tableWrapRef}
             className="table-wrap"
             tabIndex={-1}
             onKeyDown={handleRosterKeyDown}
             onPaste={(e) => {
               const text = e.clipboardData.getData('text')
               if (text) {
-                const cell = pasteCellFromEvent(e)
+                let cell = pasteCellFromEvent(e)
+                if (cellRange) {
+                  const { r0, c0 } = normalizeRange(cellRange)
+                  cell = { row: absRowFromView(r0), col: c0 }
+                }
                 e.preventDefault()
                 handlePaste(text, cell)
               }
             }}
           >
-            <table className="data-table">
+            <table className="data-table roster-select-table">
               <thead>
                 <tr>
                   <th className="sticky-col"></th>
@@ -424,7 +586,7 @@ export function ScoreEntryTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => {
+                {filtered.map((s, viewRow) => {
                   const absIndex = selectedSession.shooters.findIndex((x) => x.id === s.id)
                   return (
                     <tr key={s.id}>
@@ -441,14 +603,31 @@ export function ScoreEntryTab() {
                         />
                       </td>
                       <td className="sticky-col-2">{absIndex + 1}</td>
-                      <td className="sticky-col-3">
+                      <td
+                        className={
+                          cellInRange(cellRange, viewRow, 0)
+                            ? 'sticky-col-3 cell-selected'
+                            : 'sticky-col-3'
+                        }
+                        onMouseDown={(e) => beginCellSelect(e, { row: viewRow, col: 0 })}
+                        onMouseEnter={() => extendCellSelect({ row: viewRow, col: 0 })}
+                      >
                         <input
                           className="cell-input"
                           value={s.name}
                           data-paste-row={absIndex}
                           data-paste-col={0}
+                          data-view-row={viewRow}
+                          data-view-col={0}
                           onFocus={() => {
+                            if (suppressFocusRef.current) return
                             pasteStartRef.current = { row: absIndex, col: 0 }
+                            if (!draggingSelectRef.current) {
+                              setCellRange({
+                                anchor: { row: viewRow, col: 0 },
+                                end: { row: viewRow, col: 0 },
+                              })
+                            }
                             beginFieldEdit()
                           }}
                           onChange={(e) => {
@@ -460,27 +639,44 @@ export function ScoreEntryTab() {
                           }}
                         />
                       </td>
-                      {(['rank', 'position', 'unit'] as const).map((field, fi) => (
-                        <td key={field}>
-                          <input
-                            className="cell-input"
-                            value={s[field]}
-                            data-paste-row={absIndex}
-                            data-paste-col={fi + 1}
-                            onFocus={() => {
-                              pasteStartRef.current = { row: absIndex, col: fi + 1 }
-                              beginFieldEdit()
-                            }}
-                            onChange={(e) => {
-                              ensureEditUndo()
-                              updateShooter(selectedSession.id, {
-                                ...s,
-                                [field]: e.target.value,
-                              })
-                            }}
-                          />
-                        </td>
-                      ))}
+                      {(['rank', 'position', 'unit'] as const).map((field, fi) => {
+                        const col = fi + 1
+                        return (
+                          <td
+                            key={field}
+                            className={cellInRange(cellRange, viewRow, col) ? 'cell-selected' : undefined}
+                            onMouseDown={(e) => beginCellSelect(e, { row: viewRow, col })}
+                            onMouseEnter={() => extendCellSelect({ row: viewRow, col })}
+                          >
+                            <input
+                              className="cell-input"
+                              value={s[field]}
+                              data-paste-row={absIndex}
+                              data-paste-col={col}
+                              data-view-row={viewRow}
+                              data-view-col={col}
+                              onFocus={() => {
+                                if (suppressFocusRef.current) return
+                                pasteStartRef.current = { row: absIndex, col }
+                                if (!draggingSelectRef.current) {
+                                  setCellRange({
+                                    anchor: { row: viewRow, col },
+                                    end: { row: viewRow, col },
+                                  })
+                                }
+                                beginFieldEdit()
+                              }}
+                              onChange={(e) => {
+                                ensureEditUndo()
+                                updateShooter(selectedSession.id, {
+                                  ...s,
+                                  [field]: e.target.value,
+                                })
+                              }}
+                            />
+                          </td>
+                        )
+                      })}
                       <td>
                         <button
                           type="button"
